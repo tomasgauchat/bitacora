@@ -443,8 +443,16 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
   };
   const TABS = [["pase", "Internados"], ["cx", "Cirugías"], ["tareas", "Pendientes"], ["copia", "Copia"]];
 
+  // Avisos arriba de cada pantalla: falta instalar la app en el iPhone o activar las notificaciones.
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const INSTALLED = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  function setupNote() {
+    if (IOS && !INSTALLED) return `<p class="sample-note">Para que te lleguen los avisos, instala la app: toca Compartir y después <b>Agregar a pantalla de inicio</b>. Luego ábrela desde el ícono.</p>`;
+    if (!S.sample && AVISOS && canPush() && !pushOn && Notification.permission !== "denied") return `<p class="sample-note">Las notificaciones están apagadas. <button data-act="notif">Activarlas</button></p>`;
+    return "";
+  }
   function sampleNote() {
-    return S.sample ? `<p class="sample-note">Estos datos son inventados, para mostrar cómo funciona. <button data-act="clear-sample">Borrar ejemplos y empezar</button></p>` : "";
+    return setupNote() + (S.sample ? `<p class="sample-note">Estos datos son inventados, para mostrar cómo funciona. <button data-act="clear-sample">Borrar ejemplos y empezar</button></p>` : "");
   }
 
   // ---------- Internados (pase de sala por día) ----------
@@ -1075,7 +1083,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
         if (seven > now) reminders.push({ at: +seven, title: "Hoy a las " + c.horaCx + ": " + what, body: status, tag: "cx-" + c.id + "-7" });
       }
       if (at - 36e5 > now) reminders.push({ at: at - 36e5, title: "En 1 hora: " + what, body: status, tag: "cx-" + c.id + "-1h" });
-      events.push({ uid: "cx-" + c.id, start: icsTime(at), end: icsTime(new Date(+at + 2 * 36e5)), title: what + " · " + status, desc: status, alarms });
+      events.push({ uid: "cx-" + c.id, start: icsTime(at), end: icsTime(new Date(+at + 2 * 36e5)), title: what + (miss.length ? (miss.length === 1 ? " · falta 1 cosa" : " · faltan " + miss.length + " cosas") : " · todo listo"), desc: status, alarms });
     });
     S.todos.filter((t) => !t.done && t.time && t.date >= today()).forEach((t) => {
       const p = t.pid && patientOf(t.pid);
