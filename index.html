@@ -321,7 +321,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     } catch (e) {}
     S = sampleData();
   }
-  function save() { setTimeout(() => scheduleAlerts(), 0); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast("No se pudo guardar en este teléfono"); } }
+  function save() { setTimeout(() => { scheduleAlerts(); queueSync(); }, 0); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast("No se pudo guardar en este teléfono"); } }
   function realData() { if (S.sample) S = blank(); }
   const PERSON = ["nombre", "dni", "edad", "os", "afiliado", "contacto", "app", "alergias"];
   // Las cirugías cargadas antes guardaban los datos del paciente adentro: los paso a un paciente vinculado.
@@ -580,9 +580,13 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
         <div class="card"><h2>Recuperar una copia</h2>
           <p>Elige un archivo de copia guardado antes. Reemplaza lo que hay ahora en la app.</p>
           <div class="btns"><label for="import-file">Elegir archivo…</label><input id="import-file" type="file" accept=".json,application/json" hidden></div></div>
-        <div class="card"><h2>Avisos</h2>
-          <p>Los pendientes con hora te avisan con una notificación mientras la app está abierta o recién usada. Al abrir la app cada día, también te avisa qué cirugías próximas tienen algo pendiente. Para un aviso seguro aunque el teléfono esté bloqueado, en cada pendiente toca <b>Aviso en el calendario del iPhone</b>: queda en Calendario con alarma a esa hora.</p>
-          <div class="btns"><button class="primary" data-act="notif" id="notif-btn">${notifLabel()}</button><button data-act="notif-test">Probar aviso</button></div></div>
+        <div class="card"><h2>Notificaciones</h2>
+          <p>Te avisan aunque la app esté cerrada: el día de cada cirugía a las 7:00 y una hora antes, diciendo lo que le falta al paciente en ese momento, y a la hora de cada pendiente. En el iPhone primero hay que instalar la app (ver abajo) y activarlas desde el ícono.</p>
+          <div class="btns"><button class="primary" data-act="notif" id="notif-btn">${notifLabel()}</button><button data-act="notif-test">Probar</button></div></div>
+        ${AVISOS ? `<div class="card"><h2>Calendario del iPhone</h2>
+          <p>Suscribe una vez el calendario de Bitácora y las cirugías y pendientes con hora aparecen solos en la app Calendario, con sus alarmas, y se actualizan cuando cambias algo.</p>
+          <ol class="steps"><li>Toca <b>Suscribirme</b> y después <b>Suscribirse</b>.</li><li>Antes de tocar <b>Aceptar</b>, desactiva <b>Eliminar alertas</b> para que suenen las alarmas.</li></ol>
+          <div class="btns"><a class="primary" href="${esc(calUrl())}" style="height:44px;border-radius:12px;padding:0 14px;font-weight:600;display:inline-flex;align-items:center;text-decoration:none;background:var(--accent);color:var(--accent-ink)">Suscribirme</a><button data-act="copy-cal">Copiar enlace</button></div></div>` : ""}
         <div class="card"><h2>Instalar en el iPhone</h2>
           <ol class="steps"><li>Abre esta página en Safari.</li><li>Toca el botón Compartir (el cuadrado con la flecha).</li><li>Elige <b>Agregar a pantalla de inicio</b>.</li></ol>
           <p>Después ábrela siempre desde ese ícono. Funciona sin internet.</p></div>
@@ -778,7 +782,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       ${area("c-notas", "Notas", d.notas)}
       <div class="actions">${isNew ? "" : `<button type="button" class="danger" id="del">Borrar</button>`}<button type="button" data-close>Cancelar</button><button class="primary" type="submit">Guardar</button></div>
       ${isNew ? "" : `<div class="actions"><button type="button" id="mark-op">${d.operado ? "Volver a pendientes" : "Marcar como operado"}</button>${p && isInternado(p) ? `<button type="button" id="go-pt">Ver internación</button>` : `<button type="button" id="internar">Internar hoy</button>`}</div>
-      <div class="actions"><button type="button" id="cx-cal">Actualizar recordatorio</button><button type="button" id="cancel-cx">${d.cancelada ? "Reactivar" : "Cancelar cirugía"}</button></div>`}
+      <div class="actions"><button type="button" id="cancel-cx">${d.cancelada ? "Reactivar" : "Cancelar cirugía"}</button></div>`}
     `, (el) => {
       const drawSteps = () => {
         $("#steps").innerHTML = STEP_GROUPS.map(([g, list]) => `<div class="step-group"><div class="lbl">${g}</div>${list.map(([k, l]) => {
@@ -812,8 +816,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       el.addEventListener("submit", (e) => {
         e.preventDefault(); const r = commit(); if (!r) return; save(); closeSheet(); render();
         // Al crearla o al cambiar fecha u hora, arma el recordatorio del Calendario con las dos alarmas.
-        if (isNew || before !== r[1].fechaCx + " " + r[1].horaCx) { cxCalendar(r[1], r[0]); toast(isNew ? "Cirugía agregada. Toca Agregar en el calendario" : "Fecha cambiada. Actualiza el evento en el calendario"); }
-        else toast("Guardado");
+        toast(isNew ? "Cirugía agregada. Te aviso ese día a las 7:00 y una hora antes" : before !== r[1].fechaCx + " " + r[1].horaCx ? "Fecha cambiada. Los avisos se actualizaron" : "Guardado");
       });
       const mo = $("#mark-op");
       if (mo) mo.onclick = () => {
@@ -822,7 +825,6 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
         save(); closeSheet(); render(); toast(s.operado ? "Pasó a operados" : "Volvió a pendientes", "Deshacer", () => { s.operado = !s.operado; save(); render(); });
       };
       const cc = $("#cancel-cx"); if (cc) cc.onclick = () => { if (!commit()) return; s.cancelada = !s.cancelada; save(); closeSheet(); render(); toast(s.cancelada ? "Cirugía cancelada" : "Cirugía reactivada", "Deshacer", () => { s.cancelada = !s.cancelada; save(); render(); }); };
-      const cal = $("#cx-cal"); if (cal) cal.onclick = () => { const r = commit(); if (!r) return; save(); render(); cxCalendar(r[1], r[0]); };
       const gp = $("#go-pt"); if (gp) gp.onclick = () => { if (!commit()) return; save(); tab = "pase"; day = today(); render(); openPatient(p); };
       const it = $("#internar");
       if (it) it.onclick = () => {
@@ -849,17 +851,14 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       <div class="row2">${field("t-date", "Fecha", d.date, "date")}${field("t-time", "Hora (opcional)", d.time, "time")}</div>
       <label class="f">Paciente (opcional)<select id="t-pid"><option value="">Ninguno, es mío</option>${pts.map((p) => `<option value="${p.id}" ${p.id === d.pid ? "selected" : ""}>${esc((p.cama ? p.cama + " · " : "") + p.nombre)}</option>`).join("")}</select></label>
       <div class="actions">${isNew ? "" : `<button type="button" class="danger" id="del">Borrar</button>`}<button type="button" data-close>Cancelar</button><button class="primary" type="submit">Guardar</button></div>
-      <div class="actions"><button type="button" id="t-cal">Aviso en el calendario del iPhone</button></div>
     `, (el) => {
       const collect = () => ({ text: val("t-text"), date: val("t-date") || today(), time: val("t-time"), pid: val("t-pid") || null });
       el.addEventListener("submit", (e) => {
         e.preventDefault(); const data = collect(); if (!data.text) { $("#t-text").focus(); return; }
         if (isNew) { realData(); S.todos.push(Object.assign({ id: uid(), done: false, doneAt: null }, data)); } else Object.assign(t, data);
         save(); closeSheet(); render(); scheduleAlerts();
-        if (data.time && data.date >= today()) toast("Guardado. Te aviso a las " + data.time + " si la app está abierta", "Calendario", () => addToCalendar(data));
-        else toast("Guardado");
+        toast(data.time && data.date >= today() ? "Guardado. Te aviso a las " + data.time : "Guardado");
       });
-      $("#t-cal").onclick = () => { const data = collect(); if (!data.text) { $("#t-text").focus(); return; } if (!data.time) { $("#t-time").focus(); toast("Elige una hora para el aviso"); return; } addToCalendar(data); };
       const del = $("#del");
       if (del) del.onclick = () => { const i = S.todos.indexOf(t); S.todos.splice(i, 1); save(); closeSheet(); render(); toast("Borrado", "Deshacer", () => { S.todos.splice(i, 0, t); save(); render(); }); };
     });
@@ -950,7 +949,8 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       case "clear-sample": S = blank(); save(); render(); break;
       case "export": exportData(); break;
       case "notif": askNotif(); break;
-      case "notif-test": notify("Así se ve un aviso", "Bitácora de Camila"); break;
+      case "notif-test": testPush(); break;
+      case "copy-cal": navigator.clipboard.writeText(calUrl()).then(() => toast("Enlace copiado"), () => toast(calUrl())); break;
     }
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
@@ -970,17 +970,58 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
   document.addEventListener("visibilitychange", () => { if (!document.hidden && today() !== lastDay) { if (day === lastDay) day = today(); lastDay = today(); render(); } });
 
   // ---------- avisos ----------
+  // Servidor de avisos (Cloudflare): manda las notificaciones a la hora justa aunque la app esté cerrada
+  // y publica el calendario al que se suscribe el iPhone. Vacío = solo avisos con la app abierta.
+  const AVISOS = "";
+  const DEV_KEY = KEY + "-dispositivo";
+  function deviceId() {
+    let id = ""; try { id = localStorage.getItem(DEV_KEY) || ""; } catch (e) {}
+    if (!id) {
+      id = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(24)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      try { localStorage.setItem(DEV_KEY, id); } catch (e) {}
+    }
+    return id;
+  }
+  const calUrl = () => AVISOS.replace(/^https:/, "webcal:") + "/cal/" + deviceId() + ".ics";
+  let pushOn = false;
   const canNotify = () => "Notification" in window;
+  const canPush = () => canNotify() && "serviceWorker" in navigator && "PushManager" in window;
   function notifLabel() {
-    if (!canNotify()) return "Avisos: instala la app primero";
-    return Notification.permission === "granted" ? "Avisos activados" : Notification.permission === "denied" ? "Avisos bloqueados en Ajustes" : "Activar avisos";
+    if (!canPush()) return "Instala la app primero";
+    if (Notification.permission === "denied") return "Bloqueadas en Ajustes";
+    return pushOn ? "Notificaciones activadas" : "Activar notificaciones";
+  }
+  async function checkPush() {
+    if (!canPush() || !AVISOS) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      pushOn = !!sub && Notification.permission === "granted";
+      if (pushOn) { scheduleAlerts(); queueSync(); if (tab === "copia") render(); }
+    } catch (e) {}
   }
   async function askNotif() {
-    if (!canNotify()) { toast("En iPhone los avisos funcionan con la app agregada a la pantalla de inicio"); return; }
-    if (Notification.permission === "denied") { toast("Actívalos en Ajustes > Notificaciones > Bitácora"); return; }
+    if (!canPush()) { toast("En iPhone primero agrega la app a la pantalla de inicio y ábrela desde el ícono"); return; }
+    if (Notification.permission === "denied") { toast("Actívalas en Ajustes > Notificaciones > Bitácora"); return; }
     try { await Notification.requestPermission(); } catch (e) {}
-    render(); scheduleAlerts();
-    if (Notification.permission === "granted") toast("Avisos activados");
+    if (Notification.permission !== "granted") { render(); return; }
+    if (!AVISOS) { render(); toast("Avisos activados con la app abierta"); return; }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const { key } = await (await fetch(AVISOS + "/api/vapid")).json();
+      const raw = atob(key.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((key.length + 3) % 4));
+      const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: Uint8Array.from(raw, (c) => c.charCodeAt(0)) }));
+      await syncServer(sub);
+      pushOn = true; scheduleAlerts(); render(); toast("Notificaciones activadas");
+    } catch (e) { render(); toast("No se pudieron activar las notificaciones. Revisa tener internet y vuelve a intentar"); }
+  }
+  async function testPush() {
+    if (!pushOn) { notify("Así se ve un aviso", "Bitácora"); return; }
+    try {
+      await syncServer();
+      const r = await (await fetch(AVISOS + "/api/test/" + deviceId(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body: "Las notificaciones funcionan. Puedes cerrar la app." }) })).json();
+      toast(r.ok ? "Enviado. Llega en unos segundos" : "No llegó: " + (r.error || "error del servidor"));
+    } catch (e) { toast("Sin conexión con el servidor de avisos"); }
   }
   async function notify(body, title = "Pendiente") {
     if (canNotify() && Notification.permission === "granted") {
@@ -992,76 +1033,58 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     }
     toast(title + ": " + body);
   }
-  // Programa los avisos de hoy para pendientes con hora (funcionan mientras la app sigue viva).
+
+  // Arma la lista de avisos y de eventos del calendario. Solo lleva iniciales, nunca nombres completos.
+  const initials = (p) => ((p && p.nombre) || "").split(/[ ,]+/).filter((w) => /^[a-záéíóúñü]/i.test(w)).map((w) => w[0].toUpperCase()).join("");
+  const icsTime = (d) => ymd(d).replace(/-/g, "") + "T" + pad(d.getHours()) + pad(d.getMinutes()) + "00";
+  const dur = (min) => "-PT" + (Math.floor(min / 60) ? Math.floor(min / 60) + "H" : "") + (min % 60 ? (min % 60) + "M" : Math.floor(min / 60) ? "" : "0M");
+  function plan() {
+    const now = Date.now(), reminders = [], events = [];
+    S.surg.filter((c) => !c.operado && !c.cancelada && c.fechaCx && c.horaCx).forEach((c) => {
+      const p = patientOf(c.pid), ini = initials(p);
+      const what = "Cx " + (c.cx || c.patologia || "") + (ini ? " (" + ini + ")" : "");
+      const miss = missingOf(c).map((k) => (STEPS.some((x) => x[0] === k) ? stepLabel(k) : k).toLowerCase());
+      const status = miss.length ? "Falta: " + miss.join(", ") : "Tiene todo listo";
+      const [h, m] = c.horaCx.split(":").map(Number); const at = parseYmd(c.fechaCx); at.setHours(h, m, 0, 0);
+      const seven = parseYmd(c.fechaCx); seven.setHours(7, 0, 0, 0);
+      const alarms = ["-PT1H"];
+      if (seven < at - 36e5) {
+        alarms.unshift(dur(Math.round((at - seven) / 6e4)));
+        if (seven > now) reminders.push({ at: +seven, title: "Hoy a las " + c.horaCx + ": " + what, body: status, tag: "cx-" + c.id + "-7" });
+      }
+      if (at - 36e5 > now) reminders.push({ at: at - 36e5, title: "En 1 hora: " + what, body: status, tag: "cx-" + c.id + "-1h" });
+      events.push({ uid: "cx-" + c.id, start: icsTime(at), end: icsTime(new Date(+at + 2 * 36e5)), title: what + " · " + status, desc: status, alarms });
+    });
+    S.todos.filter((t) => !t.done && t.time && t.date >= today()).forEach((t) => {
+      const p = t.pid && patientOf(t.pid);
+      const [h, m] = t.time.split(":").map(Number); const at = parseYmd(t.date); at.setHours(h, m, 0, 0);
+      const text = (p && p.cama ? "Cama " + p.cama + ": " : "") + t.text;
+      if (at > now) reminders.push({ at: +at, title: "Pendiente " + t.time, body: text, tag: "t-" + t.id });
+      events.push({ uid: "t-" + t.id, start: icsTime(at), end: icsTime(new Date(+at + 15 * 6e4)), title: text, alarms: ["-PT0M"] });
+    });
+    return { reminders, events };
+  }
+  async function syncServer(sub) {
+    if (!AVISOS || S.sample) return;
+    const body = plan();
+    if (sub) body.subscription = sub.toJSON ? sub.toJSON() : sub;
+    const r = await fetch(AVISOS + "/api/sync/" + deviceId(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error("sync " + r.status);
+  }
+  let syncTimer;
+  function queueSync() {
+    if (!AVISOS || S.sample) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => syncServer().catch(() => {}), 1500);
+  }
+
+  // Sin servidor (o sin notificaciones activadas), avisa los pendientes de hoy mientras la app sigue abierta.
   let alertTimers = [];
   function scheduleAlerts() {
     alertTimers.forEach(clearTimeout); alertTimers = [];
-    if (S.sample) return;
-    const now = Date.now(), t = today();
-    S.todos.filter((x) => !x.done && x.time && x.date === t).forEach((x) => {
-      const [h, m] = x.time.split(":").map(Number); const at = parseYmd(t); at.setHours(h, m, 0, 0);
-      const ms = at - now; if (ms < 0) return;
-      alertTimers.push(setTimeout(() => {
-        const cur = S.todos.find((y) => y.id === x.id); if (!cur || cur.done) return;
-        const p = cur.pid && patientOf(cur.pid);
-        notify((p && p.cama ? "Cama " + p.cama + ": " : "") + cur.text, "Pendiente " + cur.time);
-      }, ms));
-    });
-    S.surg.filter((c) => !c.operado && !c.cancelada && c.fechaCx === t && c.horaCx).forEach((c) => {
-      const [h, m] = c.horaCx.split(":").map(Number); const at = parseYmd(t); at.setHours(h, m, 0, 0);
-      const seven = parseYmd(t); seven.setHours(7, 0, 0, 0);
-      [seven, new Date(at - 36e5)].forEach((when) => {
-        const ms = when - now; if (ms < 0) return;
-        alertTimers.push(setTimeout(() => {
-          const p = patientOf(c.pid) || { nombre: "" };
-          const miss = missingOf(c).map((k) => (STEPS.some((x) => x[0] === k) ? stepLabel(k) : k).toLowerCase());
-          notify((miss.length ? "Falta: " + miss.join(", ") : "Tiene todo listo"), "Cirugía " + c.horaCx + " · " + p.nombre.split(",")[0] + " · " + (c.cx || ""));
-        }, ms));
-      });
-    });
-  }
-  // Crea un evento con alarma para la app Calendario. Solo lleva la cama, no el nombre del paciente.
-  // Evento de la cirugía en el Calendario con alarmas a las 7:00 de ese día y una hora antes, diciendo qué le falta.
-  // Usa siempre el mismo identificador para que, al actualizarlo, el iPhone pueda reemplazar el evento anterior.
-  function cxCalendar(c, p) {
-    if (!c.fechaCx || !c.horaCx) { toast("Pon fecha y hora de la cirugía"); return; }
-    const ini = (p.nombre || "").split(/[ ,]+/).filter((w) => /^[a-záéíóúñü]/i.test(w)).map((w) => w[0].toUpperCase()).join("");
-    const what = "Cx " + (c.cx || c.patologia || "") + (ini ? " (" + ini + ")" : "");
-    const miss = missingOf(c).map((k) => (STEPS.some((x) => x[0] === k) ? stepLabel(k) : k).toLowerCase());
-    const status = miss.length ? "Falta: " + miss.join(", ") : "Tiene todo listo";
-    const seven = parseYmd(c.fechaCx); seven.setHours(7, 0, 0, 0);
-    const [h, m] = c.horaCx.split(":").map(Number); const at = parseYmd(c.fechaCx); at.setHours(h, m, 0, 0);
-    const alarms = ["-PT1H"];
-    if (seven < at - 36e5) alarms.unshift(seven.toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z");
-    c.calSeq = (c.calSeq || 0) + 1; save();
-    icsDownload([{ date: c.fechaCx, time: c.horaCx, minutes: 120, text: what + " · " + status, desc: status, uid: "cx-" + c.id, seq: c.calSeq, alarms }]);
-  }
-  function addToCalendar(d) {
-    const p = d.pid && patientOf(d.pid);
-    icsDownload([{ date: d.date, time: d.time, text: (p && p.cama ? "Cama " + p.cama + ": " : "") + d.text }]);
-  }
-  function icsDownload(evs) {
-    const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
-    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Bitacora de Camila//ES"];
-    evs.forEach((d) => {
-      const title = d.text.replace(/[\\,;]/g, (c) => "\\" + c).replace(/\n/g, " ");
-      const dt = d.date.replace(/-/g, "") + "T" + d.time.replace(":", "") + "00";
-      const [h, m] = d.time.split(":").map(Number); const end = new Date(parseYmd(d.date)); end.setHours(h, m + (d.minutes || 15));
-      const dtEnd = ymd(end).replace(/-/g, "") + "T" + pad(end.getHours()) + pad(end.getMinutes()) + "00";
-      lines.push("BEGIN:VEVENT", "UID:" + (d.uid || uid()) + "@bitacora", "SEQUENCE:" + (d.seq || 0), "DTSTAMP:" + stamp, "DTSTART:" + dt, "DTEND:" + dtEnd, "SUMMARY:" + title);
-      if (d.desc) lines.push("DESCRIPTION:" + d.desc.replace(/[\\,;]/g, (c) => "\\" + c));
-      (d.alarms || ["PT0M"]).forEach((t) => lines.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + title, /Z$/.test(t) ? "TRIGGER;VALUE=DATE-TIME:" + t : "TRIGGER:" + t, "END:VALARM"));
-      lines.push("END:VEVENT");
-    });
-    lines.push("END:VCALENDAR");
-    // Las líneas largas se cortan en pedazos, como pide el formato del calendario.
-    const fold = (l) => { const parts = []; for (let i = 0; i < l.length; i += 60) parts.push(l.slice(i, i + 60)); return parts.join("\r\n "); };
-    const ics = lines.map(fold).join("\r\n");
-    try {
-      const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
-      const a = document.createElement("a"); a.href = url; a.download = "aviso.ics";
-      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
-    } catch (e) { toast("No se pudo crear el aviso en este navegador"); }
+    if (S.sample || pushOn) return;
+    const now = Date.now();
+    plan().reminders.filter((r) => r.at - now < 864e5).forEach((r) => alertTimers.push(setTimeout(() => notify(r.body, r.title), r.at - now)));
   }
   // Una vez por día, al abrir la app, avisa las cirugías próximas a las que les falta algo.
   function cxDailyNotice() {
@@ -1073,9 +1096,9 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     try { localStorage.setItem(KEY + "-aviso-cx", today()); } catch (e) {}
     notify(urgent.map((a) => a.p.nombre.split(",")[0] + ": " + a.text).join("\n"), urgent.length === 1 ? "Una cirugía necesita algo" : urgent.length + " cirugías necesitan algo");
   }
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) { scheduleAlerts(); cxDailyNotice(); } });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { scheduleAlerts(); cxDailyNotice(); queueSync(); } });
 
-  load(); render(); scheduleAlerts(); setTimeout(cxDailyNotice, 1500);
+  load(); render(); scheduleAlerts(); setTimeout(cxDailyNotice, 1500); checkPush();
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
   //SW-START
   if ("serviceWorker" in navigator && window.isSecureContext) {
