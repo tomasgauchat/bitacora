@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!--PWA-HEAD-START-->
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -977,7 +977,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     if (canNotify() && Notification.permission === "granted") {
       try {
         const reg = navigator.serviceWorker && (await navigator.serviceWorker.getRegistration());
-        if (reg) { await reg.showNotification(title, { body, icon: "icons/icon-192.png", tag: body }); return; }
+        if (reg) { await reg.showNotification(title, { body, icon: "icon-192.png", tag: body }); return; }
         new Notification(title, { body }); return;
       } catch (e) {}
     }
