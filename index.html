@@ -972,7 +972,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
   // ---------- avisos ----------
   // Servidor de avisos (Cloudflare): manda las notificaciones a la hora justa aunque la app esté cerrada
   // y publica el calendario al que se suscribe el iPhone. Vacío = solo avisos con la app abierta.
-  const AVISOS = "";
+  const AVISOS = "https://bitacora-avisos.tomas-gauchat.workers.dev";
   const DEV_KEY = KEY + "-dispositivo";
   function deviceId() {
     let id = ""; try { id = localStorage.getItem(DEV_KEY) || ""; } catch (e) {}
