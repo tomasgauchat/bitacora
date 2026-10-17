@@ -575,22 +575,38 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     return `<header class="top"><div><div class="eyebrow">${n} pacientes guardados</div><h1>Copia de seguridad</h1></div></header>
       <div style="display:grid;gap:14px">
         <div class="card"><h2>Guardar una copia</h2>
-          <p>Todo se guarda solo en este teléfono, no se sube a ningún lado. Guarda una copia una vez por semana (en Archivos o iCloud Drive) para no perder nada si cambias o pierdes el teléfono.</p>
+          <p>Todo se guarda solo en este teléfono, no se sube a ningún lado. Guarda una copia una vez por semana (en Archivos, iCloud Drive o Google Drive) para no perder nada si cambias o pierdes el teléfono.</p>
           <div class="btns"><button class="primary" data-act="export">Guardar copia</button></div></div>
         <div class="card"><h2>Recuperar una copia</h2>
           <p>Elige un archivo de copia guardado antes. Reemplaza lo que hay ahora en la app.</p>
           <div class="btns"><label for="import-file">Elegir archivo…</label><input id="import-file" type="file" accept=".json,application/json" hidden></div></div>
         <div class="card"><h2>Notificaciones</h2>
-          <p>Te avisan aunque la app esté cerrada: el día de cada cirugía a las 7:00 y una hora antes, diciendo lo que le falta al paciente en ese momento, y a la hora de cada pendiente. En el iPhone primero hay que instalar la app (ver abajo) y activarlas desde el ícono.</p>
+          <p>Te avisan aunque la app esté cerrada: el día de cada cirugía a las 7:00 y una hora antes, diciendo lo que le falta al paciente en ese momento, y a la hora de cada pendiente. ${ANDROID ? "Chrome tiene que tener permiso para notificar." : "En el iPhone primero hay que instalar la app (ver abajo) y activarlas desde el ícono."}</p>
           <div class="btns"><button class="primary" data-act="notif" id="notif-btn">${notifLabel()}</button><button data-act="notif-test">Probar</button></div></div>
-        ${AVISOS ? `<div class="card"><h2>Calendario del iPhone</h2>
+        ${AVISOS ? calCard() : ""}
+        ${installCard()}
+      </div>`;
+  }
+
+  const BTN_LINK = "height:44px;border-radius:12px;padding:0 14px;font-weight:600;display:inline-flex;align-items:center;text-decoration:none;background:var(--accent);color:var(--accent-ink)";
+  function calCard() {
+    if (ANDROID) return `<div class="card"><h2>Google Calendar</h2>
+          <p>Suma las cirugías y los pendientes con hora a tu Google Calendar. Ahí sirven para ver la agenda: las alarmas llegan por las notificaciones de esta app, porque Google no copia las alarmas de un calendario suscrito y lo actualiza solo cada varias horas.</p>
+          <ol class="steps"><li>Toca <b>Agregar a Google Calendar</b>. Se abre Google Calendar en el navegador.</li><li>Confirma con <b>Agregar</b>. Si te pide, entra con tu cuenta de Google.</li><li>En la app Calendario, abre el menú y deja marcado <b>Bitácora</b>.</li></ol>
+          <div class="btns"><a class="primary" href="${esc("https://calendar.google.com/calendar/r?cid=" + encodeURIComponent(calUrl()))}" target="_blank" rel="noopener" style="${BTN_LINK}">Agregar a Google Calendar</a><button data-act="copy-cal">Copiar enlace</button></div></div>`;
+    return `<div class="card"><h2>Calendario del iPhone</h2>
           <p>Suscribe una vez el calendario de Bitácora y las cirugías y pendientes con hora aparecen solos en la app Calendario, con sus alarmas, y se actualizan cuando cambias algo.</p>
           <ol class="steps"><li>Toca <b>Suscribirme</b> y después <b>Suscribirse</b>.</li><li>Antes de tocar <b>Aceptar</b>, desactiva <b>Eliminar alertas</b> para que suenen las alarmas.</li></ol>
-          <div class="btns"><a class="primary" href="${esc(calUrl())}" style="height:44px;border-radius:12px;padding:0 14px;font-weight:600;display:inline-flex;align-items:center;text-decoration:none;background:var(--accent);color:var(--accent-ink)">Suscribirme</a><button data-act="copy-cal">Copiar enlace</button></div></div>` : ""}
-        <div class="card"><h2>Instalar en el iPhone</h2>
+          <div class="btns"><a class="primary" href="${esc(calUrl())}" style="${BTN_LINK}">Suscribirme</a><button data-act="copy-cal">Copiar enlace</button></div></div>`;
+  }
+  function installCard() {
+    if (ANDROID) return `<div class="card"><h2>Instalar en Android</h2>
+          ${installEvt ? `<div class="btns"><button class="primary" data-act="install">Instalar la app</button></div>` : ""}
+          <ol class="steps"><li>Abre esta página en Chrome.</li><li>Toca el menú <b>⋮</b> (arriba a la derecha).</li><li>Elige <b>Instalar app</b> o <b>Agregar a la pantalla principal</b>.</li></ol>
+          <p>Después ábrela siempre desde ese ícono. Funciona sin internet.</p></div>`;
+    return `<div class="card"><h2>Instalar en el iPhone</h2>
           <ol class="steps"><li>Abre esta página en Safari.</li><li>Toca el botón Compartir (el cuadrado con la flecha).</li><li>Elige <b>Agregar a pantalla de inicio</b>.</li></ol>
-          <p>Después ábrela siempre desde ese ícono. Funciona sin internet.</p></div>
-      </div>`;
+          <p>Después ábrela siempre desde ese ícono. Funciona sin internet.</p></div>`;
   }
 
   // ---------- render ----------
@@ -949,6 +965,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       case "clear-sample": S = blank(); save(); render(); break;
       case "export": exportData(); break;
       case "notif": askNotif(); break;
+      case "install": if (installEvt) { installEvt.prompt(); installEvt.userChoice.finally(() => { installEvt = null; render(); }); } break;
       case "notif-test": testPush(); break;
       case "copy-cal": navigator.clipboard.writeText(calUrl()).then(() => toast("Enlace copiado"), () => toast(calUrl())); break;
     }
@@ -982,6 +999,11 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     }
     return id;
   }
+  const ANDROID = /Android/i.test(navigator.userAgent);
+  // Chrome en Android ofrece instalar la app con un botón propio.
+  let installEvt = null;
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; if (tab === "copia") render(); });
+  window.addEventListener("appinstalled", () => { installEvt = null; if (tab === "copia") render(); });
   const calUrl = () => AVISOS.replace(/^https:/, "webcal:") + "/cal/" + deviceId() + ".ics";
   let pushOn = false;
   const canNotify = () => "Notification" in window;
@@ -1001,8 +1023,8 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     } catch (e) {}
   }
   async function askNotif() {
-    if (!canPush()) { toast("En iPhone primero agrega la app a la pantalla de inicio y ábrela desde el ícono"); return; }
-    if (Notification.permission === "denied") { toast("Actívalas en Ajustes > Notificaciones > Bitácora"); return; }
+    if (!canPush()) { toast(ANDROID ? "Este navegador no permite notificaciones. Abre la app en Chrome" : "En iPhone primero agrega la app a la pantalla de inicio y ábrela desde el ícono"); return; }
+    if (Notification.permission === "denied") { toast(ANDROID ? "Están bloqueadas: toca el candado junto a la dirección > Permisos > Notificaciones" : "Actívalas en Ajustes > Notificaciones > Bitácora"); return; }
     try { await Notification.requestPermission(); } catch (e) {}
     if (Notification.permission !== "granted") { render(); return; }
     if (!AVISOS) { render(); toast("Avisos activados con la app abierta"); return; }
