@@ -321,7 +321,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     } catch (e) {}
     S = sampleData();
   }
-  function save() { setTimeout(() => { scheduleAlerts(); queueSync(); queueBackup(); }, 0); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast("No se pudo guardar en este teléfono"); } }
+  function save() { setTimeout(() => { scheduleAlerts(); queueSync(); markDirty(); queueBackup(); }, 0); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast("No se pudo guardar en este teléfono"); } }
   function realData() { if (S.sample) S = blank(); }
   const PERSON = ["nombre", "dni", "edad", "os", "afiliado", "contacto", "app", "alergias"];
   // Las cirugías cargadas antes guardaban los datos del paciente adentro: los paso a un paciente vinculado.
@@ -602,12 +602,15 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     const code = backupCode(), last = backupLast();
     if (S.sample) return `<div class="card"><h2>Copia automática</h2><p>Cuando cargues tus propios pacientes, la app guarda sola una copia cifrada todos los días.</p></div>`;
     return `<div class="card"><h2>Copia automática</h2>
-          <p>La app guarda sola una copia de todo, cifrada, cada día que la usas. Se guardan los últimos 30 días. Solo se puede abrir con tu código, ni siquiera el servidor puede leerla.</p>
+          <p>La app guarda sola todo en la nube, cifrado, cada vez que cambias algo, y deja una copia por día de los últimos 30 días. Solo se puede abrir con tu código: ni siquiera el servidor puede leerlo.</p>
           <p><b>${last ? "Última copia: " + esc(fmtLong(last.slice(0, 10))) + " a las " + esc(last.slice(11, 16)) : "Todavía no se hizo la primera copia (hace falta internet)"}</b></p>
-          <p>Tu código para recuperarla en otro teléfono:</p>
+          <p>Tu código, para recuperar todo o usar la app también en la compu u otro dispositivo:</p>
           <p style="font:600 17px ui-monospace,Menlo,monospace;letter-spacing:.5px;user-select:all">${esc(code)}</p>
           <p>Guárdalo fuera del teléfono (por ejemplo, mándatelo por mail). Sin este código no se puede recuperar la copia.</p>
-          <div class="btns"><button class="primary" data-act="copy-code">Copiar código</button>${backupSeen() ? "" : `<button data-act="code-saved">Ya lo guardé</button>`}</div></div>`;
+          <div class="btns"><button class="primary" data-act="copy-code">Copiar código</button>${backupSeen() ? "" : `<button data-act="code-saved">Ya lo guardé</button>`}</div></div>
+        <div class="card"><h2>Usar en la compu u otro dispositivo</h2>
+          <ol class="steps"><li>En la compu, abre <b>tomasgauchat.github.io/bitacora</b>.</li><li>Ve a <b>Copia</b> y toca <b>Con mi código</b>.</li><li>Escribe el código de arriba.</li></ol>
+          <p>Desde ahí los dos dispositivos quedan sincronizados: lo que cargas en uno aparece en el otro al abrirlo (hace falta internet).</p></div>`;
   }
   const BTN_LINK = "height:44px;border-radius:12px;padding:0 14px;font-weight:600;display:inline-flex;align-items:center;text-decoration:none;background:var(--accent);color:var(--accent-ink)";
   function calCard() {
@@ -985,39 +988,92 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     clearTimeout(backupTimer);
     backupTimer = setTimeout(() => uploadBackup().catch(() => {}), 4000);
   }
+  // Sincronización entre dispositivos con el mismo código: cada cambio se sube; al abrir, si hay una versión más nueva, se baja.
+  const REV_KEY = KEY + "-copia-rev", DIRTY_KEY = KEY + "-copia-pendiente";
+  const markDirty = () => { if (!S.sample) lsSet(DIRTY_KEY, "1"); };
+  const isDirty = () => lsGet(DIRTY_KEY) === "1";
+  async function decryptBackup(k, b64) {
+    const raw = fromB64(b64);
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.subarray(0, 12) }, k.key, raw.subarray(12));
+    return JSON.parse(new TextDecoder().decode(plain));
+  }
+  // Si hubo cambios en los dos lados, junta todo; si un mismo registro cambió en ambos, gana el de este dispositivo.
+  function mergeData(local, remote) {
+    const out = { sample: false };
+    for (const k of ["patients", "notes", "todos", "surg"]) {
+      const m = new Map((remote[k] || []).map((x) => [x.id, x]));
+      (local[k] || []).forEach((x) => m.set(x.id, x));
+      out[k] = [...m.values()];
+    }
+    return out;
+  }
+  let pulling = null;
+  function pullIfNewer() {
+    if (!AVISOS || !navigator.onLine || !lsGet(CODE_KEY)) return Promise.resolve(false);
+    pulling = pulling || (async () => {
+      try {
+        backupKeys = backupKeys || (await codeKeys(backupCode()));
+        const { rev } = await (await fetch(AVISOS + "/api/backup/" + backupKeys.id + "/estado")).json();
+        if (!rev || rev <= Number(lsGet(REV_KEY) || 0)) return false;
+        const last = await (await fetch(AVISOS + "/api/backup/" + backupKeys.id + "/ultima")).json();
+        const remote = await decryptBackup(backupKeys, last.data);
+        if (!remote || remote.app !== "bitacora-camila") return false;
+        if (isDirty() && !S.sample) {
+          S = migrate(Object.assign(blank(), mergeData(S, remote)));
+        } else {
+          S = migrate(Object.assign(blank(), { patients: remote.patients, notes: remote.notes || [], todos: remote.todos || [], surg: remote.surg, sample: false }));
+        }
+        try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
+        lsSet(REV_KEY, String(last.rev));
+        scheduleAlerts(); queueSync(); render();
+        toast("Actualizado con lo cargado en otro dispositivo");
+        return true;
+      } catch (e) { return false; } finally { pulling = null; }
+    })();
+    return pulling;
+  }
   async function uploadBackup() {
     if (!AVISOS || S.sample || !navigator.onLine) return;
+    await pullIfNewer();
     backupKeys = backupKeys || (await codeKeys(backupCode()));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, backupKeys.key, new TextEncoder().encode(backupJson())));
     const data = new Uint8Array(12 + cipher.length); data.set(iv); data.set(cipher, 12);
-    const r = await fetch(AVISOS + "/api/backup/" + backupKeys.id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: today(), data: toB64(data) }) });
+    const rev = Math.max(Date.now(), Number(lsGet(REV_KEY) || 0) + 1);
+    const r = await fetch(AVISOS + "/api/backup/" + backupKeys.id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: today(), data: toB64(data), rev }) });
     if (!r.ok) throw new Error("copia " + r.status);
+    lsSet(REV_KEY, String(rev)); lsSet(DIRTY_KEY, "");
     lsSet(LAST_KEY, today() + "T" + new Date().toTimeString().slice(0, 5));
     if (tab === "copia") render();
   }
-  // Si hoy todavía no se subió la copia (por ejemplo, sin internet), la sube al abrir o volver a la app.
-  function backupIfDue() { if (AVISOS && !S.sample && backupLast().slice(0, 10) !== today()) queueBackup(); }
+  // Al abrir o volver a la app: primero trae lo nuevo de otros dispositivos y después sube lo pendiente o la copia del día.
+  async function backupIfDue() {
+    if (!AVISOS) return;
+    await pullIfNewer();
+    if (!S.sample && (isDirty() || backupLast().slice(0, 10) !== today())) queueBackup();
+  }
+  setInterval(() => { if (!document.hidden) pullIfNewer(); }, 60000);
   function cloudRestore() {
-    sheet(`<h3>Recuperar con mi código</h3>
+    sheet(`<h3>Entrar con mi código</h3>
       <label class="f">Código de la copia<input id="restore-code" autocomplete="off" autocapitalize="characters" placeholder="XXXXX-XXXXX-XXXXX-XXXXX"></label>
-      <p>Trae la copia más reciente guardada con ese código y reemplaza lo que hay ahora en la app.</p>
+      <p>Trae todo lo guardado con ese código y reemplaza lo que hay ahora en este dispositivo. Desde ahí quedan sincronizados.</p>
       <div class="actions"><button type="button" data-close>Cancelar</button><button class="primary" type="submit">Recuperar</button></div>`, (f) => f.addEventListener("submit", async (e) => {
       e.preventDefault();
       const code = $("#restore-code").value;
       if (normCode(code).length !== 20) { toast("El código tiene 20 letras y números"); return; }
       try {
         const k = await codeKeys(code);
-        const list = await (await fetch(AVISOS + "/api/backup/" + k.id)).json();
-        if (!list.dates || !list.dates.length) { toast("No hay copias guardadas con ese código"); return; }
-        const got = await (await fetch(AVISOS + "/api/backup/" + k.id + "/" + list.dates[0])).json();
-        const raw = fromB64(got.data);
-        const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.subarray(0, 12) }, k.key, raw.subarray(12));
+        const r = await fetch(AVISOS + "/api/backup/" + k.id + "/ultima");
+        if (r.status === 404) { toast("No hay nada guardado con ese código"); return; }
+        const last = await r.json();
+        const o = await decryptBackup(k, last.data);
         closeSheet();
-        applyBackup(JSON.parse(new TextDecoder().decode(plain)));
-        // Desde ahora este teléfono sigue guardando con el mismo código.
-        lsSet(CODE_KEY, normCode(code).replace(/(.{5})(?!$)/g, "$1-")); lsSet(SEEN_KEY, "1"); backupKeys = null;
-        toast("Copia del " + fmtLong(list.dates[0]) + " recuperada");
+        // Desde ahora este dispositivo usa el mismo código y queda sincronizado con los demás.
+        lsSet(CODE_KEY, normCode(code).replace(/(.{5})(?!$)/g, "$1-")); lsSet(SEEN_KEY, "1"); backupKeys = k;
+        applyBackup(o);
+        lsSet(REV_KEY, String(last.rev));
+        setTimeout(() => { lsSet(DIRTY_KEY, ""); clearTimeout(backupTimer); }, 20);
+        toast("Listo: este dispositivo quedó sincronizado");
       } catch (err) { toast("No se pudo recuperar. Revisa el código y tener internet"); }
     }));
   }

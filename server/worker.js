@@ -47,9 +47,15 @@ export default {
         let body = {};
         try { body = await req.json(); } catch (e) { return json({ error: "datos inválidos" }, 400); }
         if (!DATE_RE.test(body.date || "") || typeof body.data !== "string" || !body.data.length || body.data.length > 1900000) return json({ error: "copia inválida" }, 400);
-        return json(await stub.backupPut(body.date, body.data));
+        return json(await stub.backupPut(body.date, body.data, Number(body.rev) || Date.now()));
       }
       if (req.method === "GET" && parts.length === 3) return json(await stub.backupList());
+      // La versión más reciente, para que otros dispositivos con el mismo código se pongan al día.
+      if (req.method === "GET" && parts.length === 4 && parts[3] === "estado") return json({ rev: await stub.backupRev() });
+      if (req.method === "GET" && parts.length === 4 && parts[3] === "ultima") {
+        const last = await stub.backupLatest();
+        return last ? json(last) : json({ error: "no hay copias" }, 404);
+      }
       if (req.method === "GET" && parts.length === 4 && DATE_RE.test(parts[3])) {
         const data = await stub.backupGet(parts[3]);
         return data ? json({ date: parts[3], data }) : json({ error: "no hay copia de ese día" }, 404);
@@ -148,11 +154,18 @@ export class Device extends DurableObject {
   }
 
   // Copias: una por día (la última de ese día reemplaza a la anterior); se guardan los últimos 30 días.
-  async backupPut(date, data) {
+  async backupPut(date, data, rev) {
     await this.ctx.storage.put("copia:" + date, data);
+    await this.ctx.storage.put({ ultimaRev: rev, ultima: { rev, date, data } });
     const dates = await this.backupDates();
     for (const d of dates.slice(BACKUP_DAYS)) await this.ctx.storage.delete("copia:" + d);
-    return { ok: true, date };
+    return { ok: true, date, rev };
+  }
+  async backupRev() {
+    return (await this.ctx.storage.get("ultimaRev")) || 0;
+  }
+  async backupLatest() {
+    return (await this.ctx.storage.get("ultima")) || null;
   }
   async backupDates() {
     const keys = await this.ctx.storage.list({ prefix: "copia:" });
