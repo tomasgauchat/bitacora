@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--PWA-HEAD-START-->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Bitácora">
+<meta name="theme-color" content="#f4f3ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#11191c" media="(prefers-color-scheme: dark)">
+<!--PWA-HEAD-END-->
+<title>Bitácora de Camila</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: una columna tipo app de iPhone; arriba el título y el selector de día, tarjetas por paciente, barra de pestañas fija abajo */
+:root {
+  --bg: #f4f3ee;
+  --surface: #ffffff;
+  --ink: #1d2b30;
+  --muted: #66767b;
+  --line: #e2e2da;
+  --accent: #1f4a56;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3ecec;
+  --warm: #c9553a;
+  --warm-soft: #f8e4dd;
+  --ok: #2f7a55;
+  --ok-soft: #dcefe3;
+  --amber: #a76a00;
+  --amber-soft: #f7ecd2;
+  --pink-soft: #f6e6ee;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --font-display: ui-serif, "New York", Georgia, "Times New Roman", serif;
+  --radius: 14px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11191c; --surface: #1a2428; --ink: #e8eeee; --muted: #93a3a7; --line: #2a373c;
+    --accent: #7fb7c2; --accent-ink: #0d1517; --accent-soft: #20343a;
+    --warm: #ec8a70; --warm-soft: #3a2621; --ok: #6cc497; --ok-soft: #1d3428;
+    --amber: #e4b354; --amber-soft: #382d16; --pink-soft: #33242c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11191c; --surface: #1a2428; --ink: #e8eeee; --muted: #93a3a7; --line: #2a373c;
+  --accent: #7fb7c2; --accent-ink: #0d1517; --accent-soft: #20343a;
+  --warm: #ec8a70; --warm-soft: #3a2621; --ok: #6cc497; --ok-soft: #1d3428;
+  --amber: #e4b354; --amber-soft: #382d16; --pink-soft: #33242c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.4;
+  -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap {
+  max-width: 680px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 12px calc(96px + env(safe-area-inset-bottom, 0px));
+}
+header.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding-block: 8px 12px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h1 { font-family: var(--font-display); font-weight: 600; font-size: 30px; line-height: 1.1; margin: 2px 0 0; text-wrap: balance; }
+h2 { font-size: 13px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 650; margin: 0; }
+.add-btn {
+  flex: none; border: 0; background: var(--accent); color: var(--accent-ink); border-radius: 999px;
+  height: 44px; padding: 0 16px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;
+}
+.add-btn svg { width: 18px; height: 18px; }
+.ghost-btn { border: 1px solid var(--line); background: var(--surface); color: var(--accent); border-radius: 999px; height: 36px; padding: 0 14px; font-weight: 600; font-size: 14px; }
+
+.days { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px 14px; padding: 2px 16px 4px; scrollbar-width: none; }
+.days::-webkit-scrollbar { display: none; }
+.days button, .days label { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 12px; min-width: 56px; height: 52px; padding: 0 10px; display: grid; align-content: center; justify-items: center; font-variant-numeric: tabular-nums; position: relative; cursor: pointer; }
+.days b { font-size: 17px; line-height: 1.1; }
+.days small { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.days [aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.days [aria-pressed="true"] small { color: var(--accent-ink); opacity: .8; }
+.days input { position: absolute; inset: 0; opacity: 0; width: 100%; }
+
+.summary { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.chip-stat { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chip-stat b { color: var(--ink); }
+.chip-stat.alert { background: var(--warm-soft); border-color: transparent; color: var(--warm); }
+.chip-stat.alert b { color: var(--warm); }
+
+.stack { display: grid; gap: 10px; margin-bottom: 22px; }
+section.block { display: grid; gap: 8px; margin-bottom: 22px; }
+
+/* Tarjeta de paciente internado */
+.pt { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); display: grid; overflow: hidden; }
+.pt-main { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 14px 14px 12px; border: 0; background: none; text-align: left; width: 100%; }
+.bed { min-width: 48px; height: 48px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; padding: 0 6px; }
+.pt-id { min-width: 0; display: grid; gap: 3px; }
+.pt-name { font-weight: 650; font-size: 17px; overflow-wrap: anywhere; }
+.pt-sub { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; font-variant-numeric: tabular-nums; }
+.pt-dx { font-size: 15px; overflow-wrap: anywhere; }
+.allergy { display: inline-block; font-size: 12px; font-weight: 700; color: var(--warm); background: var(--warm-soft); border-radius: 6px; padding: 1px 7px; letter-spacing: .02em; }
+.pt-day { border-top: 1px solid var(--line); padding: 10px 14px 12px; display: grid; gap: 8px; }
+.lbl { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.nov { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.nov.none { color: var(--muted); font-style: italic; }
+.pend-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.pchip { border: 0; border-radius: 999px; background: var(--pink-soft); color: var(--ink); padding: 6px 10px 6px 8px; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; text-align: left; }
+.pchip .bx { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--muted); flex: none; }
+.pchip.done { background: var(--ok-soft); color: var(--muted); text-decoration: line-through; }
+.pchip.done .bx { background: var(--ok); border-color: var(--ok); }
+
+/* Listas de pendientes */
+.list { display: grid; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.item { display: grid; grid-template-columns: 44px 1fr auto; align-items: start; gap: 4px; padding: 8px 6px 8px 2px; border-top: 1px solid var(--line); }
+.item:first-child { border-top: 0; }
+.check { width: 44px; height: 44px; border: 0; background: none; display: grid; place-items: center; padding: 0; }
+.check span { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--muted); display: grid; place-items: center; }
+.check.on span { background: var(--ok); border-color: var(--ok); }
+.check.on span::after { content: ""; width: 10px; height: 6px; border: 2px solid var(--surface); border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+.body { min-width: 0; padding-top: 10px; }
+.text { overflow-wrap: anywhere; white-space: pre-wrap; }
+.item.done .text { color: var(--muted); text-decoration: line-through; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 3px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.meta .late { color: var(--warm); font-weight: 600; }
+.more { width: 40px; height: 44px; border: 0; background: none; color: var(--muted); font-size: 20px; line-height: 1; }
+.empty { padding: 18px 16px; color: var(--muted); font-size: 15px; background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); }
+.empty b { color: var(--ink); }
+
+/* Cirugías */
+.cx { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 6px; text-align: left; width: 100%; }
+.f .cx { color: var(--ink); font-weight: 400; font-size: 16px; }
+.tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.state.urgente { background: var(--warm); color: #fff; }
+.state.falta { background: var(--warm-soft); color: var(--warm); }
+.state.prog { background: var(--ok-soft); color: var(--ok); }
+.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ok); border-radius: 3px; }
+.missing { font-size: 14px; color: var(--warm); overflow-wrap: anywhere; }
+.missing b { font-weight: 650; }
+.steps-box { display: grid; gap: 12px; }
+.step-group { display: grid; gap: 0; background: var(--bg); border-radius: 12px; overflow: hidden; }
+.step-group .lbl { padding: 10px 12px 2px; }
+.step { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 2px; min-height: 48px; padding: 2px 10px 2px 2px; border: 0; background: none; text-align: left; width: 100%; color: var(--ink); font-size: 15px; font-weight: 400; }
+.step + .step { border-top: 1px solid var(--line); }
+.step .ck { width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--muted); justify-self: center; display: grid; place-items: center; }
+.step.on .ck { background: var(--ok); border-color: var(--ok); }
+.step.on .ck::after { content: ""; width: 10px; height: 6px; border: 2px solid var(--surface); border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+.step > span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
+.steps-box, .step-group { min-width: 0; }
+.step small { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.step.off-row { opacity: .45; }
+.alert-card { background: var(--warm-soft); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 4px; border: 0; text-align: left; width: 100%; color: var(--ink); }
+.alert-card b { color: var(--warm); }
+.alert-card div { font-size: 14px; }
+.switch { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--ink); font-weight: 400; }
+.switch input { width: 22px; height: 22px; accent-color: var(--accent); }
+.cx-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.cx-name { font-weight: 650; font-size: 16px; overflow-wrap: anywhere; min-width: 0; }
+.cx-name span { color: var(--muted); font-weight: 400; }
+.cx-line { font-size: 14px; overflow-wrap: anywhere; }
+.cx-line span { color: var(--muted); }
+.state { flex: none; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 10px; background: var(--line); color: var(--muted); }
+.state.autorizado { background: var(--ok-soft); color: var(--ok); }
+.state.admision { background: var(--amber-soft); color: var(--amber); }
+.state.tramite { background: var(--accent-soft); color: var(--accent); }
+.state.cancelada { background: var(--ink); color: var(--bg); }
+.state.operado { background: var(--accent); color: var(--accent-ink); }
+.filters { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px 12px; padding: 0 16px; scrollbar-width: none; }
+.filters::-webkit-scrollbar { display: none; }
+.filters button { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-size: 14px; }
+.filters button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.search { width: 100%; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); padding: 0 12px; margin-bottom: 10px; }
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--line); border-radius: 10px; padding: 3px; gap: 3px; margin-bottom: 12px; }
+.seg button { border: 0; background: none; height: 36px; border-radius: 8px; font-weight: 600; color: var(--muted); font-size: 15px; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .12); }
+
+.quick { display: flex; gap: 8px; }
+.quick input { flex: 1; min-width: 0; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); padding: 0 12px; font-size: 16px; }
+.quick button { height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); padding: 0 14px; font-weight: 600; color: var(--accent); }
+.sheet .quick input, .sheet .quick button { background: var(--bg); }
+
+nav.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; justify-content: center;
+  background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+nav.tabs .in { display: grid; grid-template-columns: repeat(4, 1fr); width: 100%; max-width: 680px; }
+nav.tabs button { border: 0; background: none; height: 58px; display: grid; justify-items: center; align-content: center; gap: 3px; font-size: 11px; color: var(--muted); font-weight: 600; }
+nav.tabs button svg { width: 24px; height: 24px; }
+nav.tabs button[aria-current="page"] { color: var(--accent); }
+.badge { position: absolute; transform: translate(12px, -6px); background: var(--warm); color: #fff; font-size: 10px; min-width: 16px; height: 16px; border-radius: 8px; display: grid; place-items: center; padding: 0 4px; }
+.tabicon { position: relative; display: grid; place-items: center; }
+
+/* Hoja inferior para ver / editar */
+.sheet-bg { position: fixed; inset: 0; background: rgb(0 0 0 / .35); z-index: 30; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 31; background: var(--surface); border-radius: 18px 18px 0 0;
+  max-height: calc(100% - 24px - env(safe-area-inset-top, 0px)); overflow: auto; overscroll-behavior: contain; box-shadow: 0 -8px 30px rgb(0 0 0 / .18);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 10px calc(16px + env(safe-area-inset-bottom, 0px));
+}
+.sheet .in { max-width: 620px; margin: 0 auto; display: grid; gap: 14px; }
+.grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto 2px; }
+.sheet h3 { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 600; overflow-wrap: anywhere; }
+.sheet h4 { margin: 4px 0 0; font-size: 13px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.f { display: grid; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 600; min-width: 0; }
+.f textarea, .f input, .f select { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 16px; font-weight: 400; color: var(--ink); min-height: 44px; }
+.f textarea { min-height: 76px; resize: vertical; line-height: 1.35; }
+.f textarea.big { min-height: 150px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+@media (max-width: 380px) { .row3 { grid-template-columns: 1fr 1fr; } }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.opts button { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 7px 12px; font-size: 14px; color: var(--ink); }
+.opts button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions button { flex: 1; height: 48px; border-radius: 12px; font-weight: 650; border: 1px solid var(--line); background: var(--bg); padding: 0 14px; color: var(--ink); }
+.actions .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.actions .danger { color: var(--warm); flex: none; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; margin: 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+.hist { display: grid; gap: 10px; }
+.hist-day { border-left: 3px solid var(--line); padding-left: 10px; display: grid; gap: 3px; }
+.hist-day b { font-size: 13px; color: var(--muted); }
+.hist-day div { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.confirm { background: var(--warm-soft); border-radius: 12px; padding: 12px; display: grid; gap: 10px; font-size: 15px; }
+.tel { justify-self: start; display: inline-flex; align-items: center; text-decoration: none; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 10px; }
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+.card .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.card .btns button, .card .btns label { height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 0 14px; font-weight: 600; display: inline-flex; align-items: center; cursor: pointer; font-size: 15px; color: var(--ink); }
+.card .btns .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; display: grid; gap: 4px; }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 40;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--bg); border-radius: 12px; padding: 10px 10px 10px 16px;
+  display: flex; align-items: center; gap: 12px; font-size: 15px; max-width: calc(100% - 32px); box-shadow: 0 6px 20px rgb(0 0 0 / .2);
+}
+.toast button { border: 0; background: none; color: var(--bg); font-weight: 700; text-decoration: underline; padding: 6px; }
+.sample-note { font-size: 13px; color: var(--amber); background: var(--amber-soft); border-radius: 10px; padding: 8px 12px; margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.sample-note button { border: 0; background: none; color: var(--accent); font-weight: 700; padding: 0; text-decoration: underline; font-size: 13px; }
+@media (prefers-reduced-motion: no-preference) {
+  .sheet { animation: up .22s ease-out; }
+  @keyframes up { from { transform: translateY(30px); } }
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<nav class="tabs" aria-label="Secciones"><div class="in" id="tabs"></div></nav>
+<div id="layer"></div>
+
+<script>
+(function () {
+  "use strict";
+  const KEY = "bitacora-camila-v2";
+  // El circuito de cada cirugía, en el orden en que se hace.
+  const STEP_GROUPS = [
+    ["Prequirúrgicos", [["pre", "Se le dieron los prequirúrgicos"], ["turnos", "Sacó los turnos en admisión"], ["lab", "Laboratorio"], ["ecg", "Electrocardiograma / riesgo cardiológico"], ["rx", "RX de tórax"], ["anest", "Evaluación anestésica"]]],
+    ["Admisión y quirófano", [["admision", "Cargado en admisión"], ["quirofano", "Cargado en quirófano"]]],
+    ["Materiales y autorizaciones", [["pedido", "Pedido de materiales enviado a ortopedia"], ["autMat", "Autorización de los materiales"], ["autCx", "Autorización de la cirugía"]]],
+  ];
+  const STEPS = STEP_GROUPS.flatMap((g) => g[1]);
+  const PRE = ["pre", "turnos", "lab", "ecg", "rx", "anest"];
+  const MAT = ["pedido", "autMat"];
+  const stepLabel = (k) => (STEPS.find((x) => x[0] === k) || [k, k])[1];
+  const stepsFor = (c) => STEPS.map((x) => x[0]).filter((k) => !(c.sinMateriales && MAT.includes(k)));
+  const isDone = (c, k) => !!(c.steps && c.steps[k]);
+  const missingOf = (c) => stepsFor(c).filter((k) => !isDone(c, k)).concat((c.extra || []).filter((x) => !x.done).map((x) => x.text));
+
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pad = (n) => String(n).padStart(2, "0");
+  const ymd = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const today = () => ymd(new Date());
+  const nowHM = () => { const d = new Date(); return pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const parseYmd = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const addDays = (s, n) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
+  const diffDays = (a, b) => Math.round((parseYmd(a) - parseYmd(b)) / 864e5);
+  const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const fmtLong = (s) => cap(parseYmd(s).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" }));
+  const fmtShort = (s) => s ? parseYmd(s).toLocaleDateString("es", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "";
+  function dayLabel(s) {
+    const t = today();
+    if (s === t) return "Hoy";
+    if (s === addDays(t, 1)) return "Mañana";
+    if (s === addDays(t, -1)) return "Ayer";
+    return fmtLong(s);
+  }
+
+  // ---------- datos ----------
+  // patients: { id, cama, nombre, edad, dni, os, afiliado, contacto, medico, app, alergias, dx, ingreso, alta }
+  // notes:    { id, pid, date, controles, novedades }   (una por paciente y por día)
+  // todos:    { id, pid|null, text, date, time, done, doneAt }
+  // surg:     { id, pid, medico, patologia, cx, consulta, fechaCx, operado, cancelada, sinMateriales, notas,
+  //             steps: { clave: fecha en que se hizo }, extra: [{ text, done }] }  (los datos personales viven en patients)
+  // Un paciente sin ingreso no está internado: solo aparece en Cirugías y en la búsqueda.
+  const blank = () => ({ patients: [], notes: [], todos: [], surg: [], sample: false });
+  let S = blank();
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) { S = migrate(Object.assign(blank(), JSON.parse(raw))); return; }
+    } catch (e) {}
+    S = sampleData();
+  }
+  function save() { setTimeout(() => scheduleAlerts(), 0); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast("No se pudo guardar en este teléfono"); } }
+  function realData() { if (S.sample) S = blank(); }
+  const PERSON = ["nombre", "dni", "edad", "os", "afiliado", "contacto", "app", "alergias"];
+  // Las cirugías cargadas antes guardaban los datos del paciente adentro: los paso a un paciente vinculado.
+  function migrate(data) {
+    data.surg.forEach((c) => {
+      if (c.pid && data.patients.some((p) => p.id === c.pid)) return;
+      let p = c.dni && data.patients.find((x) => x.dni && x.dni === c.dni);
+      if (!p) { p = { id: uid(), cama: "", medico: c.medico || "", dx: "", ingreso: null, alta: null }; PERSON.forEach((k) => (p[k] = c[k] || "")); data.patients.push(p); }
+      c.pid = p.id; PERSON.forEach((k) => delete c[k]);
+    });
+    data.surg.forEach((c) => {
+      if (!c.steps) {
+        c.steps = {}; const d = c.consulta || ymd(new Date());
+        if (c.estado === "admision" || c.estado === "autorizado") PRE.concat(["admision"]).forEach((k) => (c.steps[k] = d));
+        if (c.estado === "autorizado") c.steps.autCx = d;
+        if (c.estado === "cancelada") c.cancelada = true;
+        delete c.estado;
+      }
+      if (!c.extra) c.extra = [];
+    });
+    return data;
+  }
+
+  // Ejemplos inventados, solo para mostrar cómo se usa.
+  function sampleData() {
+    const t = today(), y = addDays(t, -1);
+    const p1 = { id: uid(), cama: "201", nombre: "Pérez, Ana (ejemplo)", edad: "71", dni: "10000001", os: "IOSFA", afiliado: "000000/01", contacto: "", medico: "Dr. Gómez", app: "HTA, DBT2", alergias: "Penicilina", dx: "Fractura de cadera derecha", ingreso: addDays(t, -3), alta: null };
+    const p2 = { id: uid(), cama: "203", nombre: "López, Juan (ejemplo)", edad: "58", dni: "20000002", os: "IOSFA", afiliado: "", contacto: "", medico: "Dra. Ruiz", app: "Tabaquista", alergias: "", dx: "POP osteosíntesis de tobillo izquierdo", ingreso: addDays(t, -1), alta: null };
+    const out = (nombre, dni, edad, contacto) => ({ id: uid(), cama: "", nombre, edad, dni, os: "IOSFA", afiliado: "", contacto, medico: "", app: "", alergias: "", dx: "", ingreso: null, alta: null });
+    const p3 = out("Martínez, Rosa (ejemplo)", "30000003", "64", "351 000-0000"), p4 = out("Sosa, Luis (ejemplo)", "40000004", "76", ""), p5 = out("Díaz, Marta (ejemplo)", "50000005", "54", "");
+    return {
+      sample: true,
+      patients: [p1, p2, p3, p4, p5],
+      notes: [
+        { id: uid(), pid: p1.id, date: y, controles: "TA 130/80", novedades: "Lab: Hto 33, GB 7400. Se solicita valoración por cardiología." },
+        { id: uid(), pid: p1.id, date: t, controles: "TA 120/70, afebril", novedades: "Buena evolución. Cardiología autoriza cirugía. Se aguarda autorización de materiales." },
+        { id: uid(), pid: p2.id, date: t, controles: "", novedades: "Tolera dieta. Dolor controlado. Posible alta mañana." },
+      ],
+      todos: [
+        { id: uid(), pid: p1.id, text: "Pedir materiales", date: t, time: "", done: false, doneAt: null },
+        { id: uid(), pid: p1.id, text: "Control de TA", date: t, time: "", done: true, doneAt: t + "T09:40" },
+        { id: uid(), pid: p2.id, text: "Curación", date: t, time: "", done: false, doneAt: null },
+        { id: uid(), pid: null, text: "Firmar epicrisis", date: t, time: "13:00", done: false, doneAt: null },
+      ],
+      surg: [
+        { id: uid(), pid: p1.id, medico: "Dr. Gómez", patologia: "Fractura de cadera derecha", cx: "Osteosíntesis de cadera", consulta: addDays(t, -3), fechaCx: addDays(t, 1), operado: false, notas: "",
+          steps: { pre: addDays(t, -3), turnos: addDays(t, -3), lab: addDays(t, -2), ecg: addDays(t, -1), rx: addDays(t, -2), anest: addDays(t, -1), admision: addDays(t, -1), quirofano: addDays(t, -1), pedido: addDays(t, -1) }, extra: [] },
+        { id: uid(), pid: p3.id, medico: "Dr. Gómez", patologia: "Síndrome de túnel carpiano", cx: "Liberación túnel carpiano", consulta: addDays(t, -20), fechaCx: addDays(t, 6), operado: false, notas: "", sinMateriales: true,
+          steps: { pre: addDays(t, -20), turnos: addDays(t, -19), lab: addDays(t, -15), ecg: addDays(t, -15), rx: addDays(t, -15), anest: addDays(t, -10), admision: addDays(t, -8), quirofano: addDays(t, -2), autCx: addDays(t, -5) }, extra: [] },
+        { id: uid(), pid: p4.id, medico: "Dra. Ruiz", patologia: "Gonartrosis izquierda", cx: "RTR", consulta: addDays(t, -9), fechaCx: "", operado: false, notas: "",
+          steps: { pre: addDays(t, -9), turnos: addDays(t, -8), lab: addDays(t, -6) }, extra: [{ text: "Riesgo quirúrgico con clínica", done: false }] },
+        { id: uid(), pid: p5.id, medico: "Dr. Gómez", patologia: "Fractura de radio distal derecho", cx: "Osteosíntesis de radio", consulta: addDays(t, -30), fechaCx: addDays(t, -5), operado: true, notas: "",
+          steps: Object.fromEntries(STEPS.map(([k]) => [k, addDays(t, -6)])), extra: [] },
+      ],
+    };
+  }
+
+  // ---------- helpers de datos ----------
+  const internadosEn = (d) => S.patients.filter((p) => p.ingreso && p.ingreso <= d && (!p.alta || p.alta >= d)).sort((a, b) => String(a.cama).localeCompare(String(b.cama), "es", { numeric: true }));
+  const noteOf = (pid, d) => S.notes.find((n) => n.pid === pid && n.date === d);
+  const lastNoteBefore = (pid, d) => S.notes.filter((n) => n.pid === pid && n.date < d && (n.novedades || n.controles)).sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+  const patientOf = (id) => S.patients.find((p) => p.id === id);
+  const norm = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const isInternado = (p) => p.ingreso && p.ingreso <= today() && (!p.alta || p.alta >= today());
+  const surgOf = (pid) => S.surg.filter((c) => c.pid === pid);
+  // En qué parte del circuito está una cirugía: [clave, texto, clase de color].
+  function stageOf(c) {
+    if (c.cancelada) return ["cancelada", "Cancelada", "cancelada"];
+    if (c.operado) return ["operado", "Operado", "operado"];
+    const miss = missingOf(c);
+    const days = c.fechaCx ? diffDays(c.fechaCx, today()) : null;
+    if (days !== null && days <= 3 && miss.length) return ["alerta", days < 0 ? "Fecha pasada" : days === 0 ? "Hoy · falta algo" : days === 1 ? "Mañana · falta algo" : "En " + days + " días · falta algo", "urgente"];
+    if (isDone(c, "quirofano")) return ["prog", c.fechaCx ? "Programada " + fmtShort(c.fechaCx).slice(0, 5) : "En quirófano", miss.length ? "falta" : "prog"];
+    if (isDone(c, "admision")) return ["quiro", "Cargar en quirófano", "tramite"];
+    if (PRE.every((k) => isDone(c, k))) return ["adm", "Cargar en admisión", "admision"];
+    return ["pre", "Prequirúrgicos " + PRE.filter((k) => isDone(c, k)).length + "/" + PRE.length, ""];
+  }
+  // Lo que hay que hacer ya con cada cirugía (para la lista de pendientes y los avisos).
+  function cxAlerts() {
+    const out = [];
+    S.surg.filter((c) => !c.operado && !c.cancelada).forEach((c) => {
+      const p = patientOf(c.pid) || { nombre: "Sin nombre" };
+      const miss = missingOf(c);
+      const days = c.fechaCx ? diffDays(c.fechaCx, today()) : null;
+      const add = (urgent, text) => out.push({ c, p, urgent, text });
+      if (days !== null && days <= 3 && miss.length) add(true, (days < 0 ? "La fecha de cirugía ya pasó" : days === 0 ? "Se opera hoy" : days === 1 ? "Se opera mañana" : "Se opera en " + days + " días") + " y falta: " + miss.map((k) => stepLabel(k).toLowerCase()).join(", "));
+      else {
+        if (isDone(c, "quirofano") && !c.sinMateriales && !isDone(c, "pedido")) add(false, "Ya está en quirófano: hacer el pedido de materiales a ortopedia");
+        if (isDone(c, "pedido") && !isDone(c, "autMat")) add(false, "Fijarse si salió la autorización de los materiales");
+        if (isDone(c, "quirofano") && !isDone(c, "autCx")) add(false, "Fijarse si salió la autorización de la cirugía");
+        if (isDone(c, "admision") && !isDone(c, "quirofano")) add(false, "Ya está en admisión: cargarlo en quirófano");
+        if (PRE.every((k) => isDone(c, k)) && !isDone(c, "admision")) add(false, "Tiene todos los prequirúrgicos: que lo carguen en admisión");
+        if (isDone(c, "pre") && !PRE.every((k) => isDone(c, k)) && diffDays(today(), c.steps.pre) >= 14) add(false, "Hace " + diffDays(today(), c.steps.pre) + " días que se llevó los prequirúrgicos y todavía faltan");
+      }
+    });
+    return out.sort((a, b) => (a.urgent === b.urgent ? 0 : a.urgent ? -1 : 1));
+  }
+  function alertCard(a) {
+    return `<button class="alert-card" data-act="open-cx" data-id="${a.c.id}"><b>${esc(a.p.nombre)} · ${esc(a.c.cx || a.c.patologia || "Cirugía")}</b><div>${esc(a.text)}</div></button>`;
+  }
+  const overdue = (t) => !t.done && t.date < today();
+  const byTime = (a, b) => ((a.time || "99") < (b.time || "99") ? -1 : (a.time || "99") > (b.time || "99") ? 1 : 0);
+  function setNote(pid, d, fields) {
+    let n = noteOf(pid, d);
+    if (!n) { n = { id: uid(), pid, date: d, controles: "", novedades: "" }; S.notes.push(n); }
+    Object.assign(n, fields);
+    if (!n.controles && !n.novedades) S.notes = S.notes.filter((x) => x !== n);
+  }
+
+  // ---------- estado de la vista ----------
+  let tab = "pase", day = today(), cxTab = "pend", cxFilter = "all", cxQuery = "";
+  const ICONS = {
+    pase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18V8M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="2"/></svg>',
+    cx: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="17" rx="2.5"/><path d="M9 3h6v3H9zM8.5 11h7M8.5 15h4.5"/></svg>',
+    tareas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 7 2 2 3.5-4M4 16l2 2 3.5-4M13 7.5h7M13 16.5h7"/></svg>',
+    copia: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v11M7.5 9.5 12 14l4.5-4.5"/><path d="M4.5 15v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    cal: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+  };
+  const TABS = [["pase", "Internados"], ["cx", "Cirugías"], ["tareas", "Pendientes"], ["copia", "Copia"]];
+
+  function sampleNote() {
+    return S.sample ? `<p class="sample-note">Estos datos son inventados, para mostrar cómo funciona. <button data-act="clear-sample">Borrar ejemplos y empezar</button></p>` : "";
+  }
+
+  // ---------- Internados (pase de sala por día) ----------
+  function dayStrip() {
+    const t = today(), btns = [];
+    for (let i = -6; i <= 1; i++) {
+      const d = addDays(t, i), dt = parseYmd(d);
+      btns.push(`<button data-day="${d}" aria-pressed="${d === day}"><small>${i === 0 ? "Hoy" : dt.toLocaleDateString("es", { weekday: "short" }).replace(".", "")}</small><b>${dt.getDate()}/${dt.getMonth() + 1}</b></button>`);
+    }
+    const inStrip = diffDays(day, t) >= -6 && diffDays(day, t) <= 1;
+    btns.unshift(`<label aria-pressed="${!inStrip}"><small>Otro día</small><b>${inStrip ? ICONS.cal : esc(fmtShort(day).slice(0, 5))}</b><input id="pick-day" type="date" value="${day}" aria-label="Elegir otro día"></label>`);
+    return `<div class="days" id="days">${btns.join("")}</div>`;
+  }
+  function patientCard(p) {
+    const n = noteOf(p.id, day);
+    const prev = !n && lastNoteBefore(p.id, day);
+    const pend = S.todos.filter((t) => t.pid === p.id && (t.date === day || (day === today() && overdue(t))));
+    const dias = diffDays(day, p.ingreso);
+    return `<div class="pt">
+      <button class="pt-main" data-act="open-pt" data-id="${p.id}">
+        <div class="bed">${esc(p.cama || "–")}</div>
+        <div class="pt-id">
+          <div class="pt-name">${esc(p.nombre)}</div>
+          <div class="pt-sub">${p.edad ? `<span>${esc(p.edad)} años</span>` : ""}${p.medico ? `<span>${esc(p.medico)}</span>` : ""}<span>Día ${dias + 1} de internación</span>${p.alta === day ? "<span>Alta</span>" : ""}</div>
+          ${p.alergias ? `<div><span class="allergy">ALERGIA: ${esc(p.alergias.toUpperCase())}</span></div>` : ""}
+          <div class="pt-dx">${esc(p.dx || "Sin diagnóstico cargado")}</div>
+        </div>
+      </button>
+      <div class="pt-day">
+        ${n && n.controles ? `<div><div class="lbl">Controles</div><div class="nov">${esc(n.controles)}</div></div>` : ""}
+        <div><div class="lbl">Novedades</div>${n && n.novedades ? `<div class="nov">${esc(n.novedades)}</div>` : `<div class="nov none">${prev ? "Sin novedades este día. La última es de " + esc(dayLabel(prev.date).toLowerCase()) + "." : "Sin novedades este día."}</div>`}</div>
+        ${pend.length ? `<div><div class="lbl">Pendientes</div><div class="pend-row">${pend.map((t) => `<button class="pchip ${t.done ? "done" : ""}" data-act="toggle" data-id="${t.id}"><span class="bx"></span>${esc(t.text)}</button>`).join("")}</div></div>` : ""}
+      </div></div>`;
+  }
+  function viewPase() {
+    const pts = internadosEn(day);
+    const pendN = S.todos.filter((t) => t.pid && !t.done && (t.date === day || (day === today() && t.date < day))).length;
+    return `
+      <header class="top"><div><div class="eyebrow">${esc(fmtLong(day))}</div><h1>Internados</h1></div>
+        <button class="add-btn" data-act="new-pt">${ICONS.plus}Paciente</button></header>
+      ${sampleNote()}
+      ${dayStrip()}
+      <div class="summary">
+        <span class="chip-stat"><b>${pts.length}</b> internados</span>
+        <span class="chip-stat ${pendN ? "alert" : ""}"><b>${pendN}</b> pendientes</span>
+        ${pts.length ? `<button class="ghost-btn" data-act="share-pase">Compartir pase</button>` : ""}
+      </div>
+      <div class="stack">${pts.length ? pts.map(patientCard).join("") : `<div class="empty">No hay pacientes internados este día. Toca <b>Paciente</b> para agregar el primero; después aparece todos los días hasta que le des el alta.</div>`}</div>`;
+  }
+
+  // ---------- Cirugías ----------
+  const CX_FILTERS = [["all", "Todos"], ["need", "Necesitan algo"], ["pre", "Prequirúrgicos"], ["adm", "Para admisión"], ["quiro", "Para quirófano"], ["prog", "Programadas"], ["cancelada", "Canceladas"]];
+  function viewCx() {
+    const q = cxQuery.trim().toLowerCase();
+    const alerts = cxAlerts(), needIds = new Set(alerts.map((a) => a.c.id));
+    let items = S.surg.filter((s) => (cxTab === "op" ? s.operado : !s.operado));
+    const stage = (c) => { const k = stageOf(c)[0]; return k === "alerta" ? "prog" : k; };
+    if (cxTab === "pend" && cxFilter !== "all") items = items.filter((c) => (cxFilter === "need" ? needIds.has(c.id) : cxFilter === "prog" ? ["prog", "alerta"].includes(stageOf(c)[0]) : stage(c) === cxFilter));
+    if (cxTab === "pend" && cxFilter !== "cancelada") items = items.filter((c) => !c.cancelada);
+    if (q) items = items.filter((s) => { const p = patientOf(s.pid) || {}; return norm([p.nombre, p.dni, p.afiliado, s.medico, s.patologia, s.cx].join(" ")).includes(norm(q)); });
+    items.sort(cxTab === "op"
+      ? (a, b) => ((a.fechaCx || "") < (b.fechaCx || "") ? 1 : -1)
+      : (a, b) => ((a.fechaCx || "9") < (b.fechaCx || "9") ? -1 : (a.fechaCx || "9") > (b.fechaCx || "9") ? 1 : (a.consulta || "") < (b.consulta || "") ? -1 : 1));
+    const nPend = S.surg.filter((s) => !s.operado && !s.cancelada).length, nOp = S.surg.filter((s) => s.operado).length;
+    const count = (k) => S.surg.filter((c) => !c.operado && (k === "need" ? needIds.has(c.id) : k === "cancelada" ? c.cancelada : !c.cancelada && (k === "prog" ? ["prog", "alerta"].includes(stageOf(c)[0]) : stage(c) === k))).length;
+    return `
+      <header class="top"><div><div class="eyebrow">${nPend} por operar · ${nOp} operados</div><h1>Cirugías</h1></div>
+        <button class="add-btn" data-act="new-cx">${ICONS.plus}Cirugía</button></header>
+      ${sampleNote()}
+      <div class="seg" role="group" aria-label="Lista"><button data-cxtab="pend" aria-pressed="${cxTab === "pend"}">Pendientes</button><button data-cxtab="op" aria-pressed="${cxTab === "op"}">Operados</button></div>
+      <input class="search" id="cx-search" type="search" placeholder="Buscar por nombre, DNI, médico o cirugía" aria-label="Buscar" value="${esc(cxQuery)}">
+      ${cxTab === "pend" ? `<div class="filters">${CX_FILTERS.map(([k, l]) => { const n = k === "all" ? 0 : count(k); return `<button data-cxf="${k}" aria-pressed="${cxFilter === k}">${l}${n ? " · " + n : ""}</button>`; }).join("")}</div>` : ""}
+      <div class="stack">${items.length ? items.map(cxCard).join("") : `<div class="empty">${q || (cxTab === "pend" && cxFilter !== "all") ? "No hay cirugías en esta lista." : cxTab === "op" ? "Cuando marques una cirugía como hecha, el paciente pasa a esta lista." : "Toca <b>Cirugía</b> para cargar a alguien que tiene que operarse."}</div>`}</div>`;
+  }
+  function cxCard(s) {
+    const [, stLabel, stCls] = stageOf(s);
+    const all = stepsFor(s).length + (s.extra || []).length, miss = missingOf(s);
+    const p = patientOf(s.pid) || {};
+    const next = s.operado || s.cancelada ? [] : miss.slice(0, 3).map((k) => (STEPS.some((x) => x[0] === k) ? stepLabel(k) : k));
+    s = Object.assign({}, p, s, { nombre: p.nombre || "Sin nombre", internado: p.id && isInternado(p) });
+    return `<button class="cx" data-act="open-cx" data-id="${s.id}">
+      <div class="cx-top"><div class="cx-name">${esc(s.nombre)}${s.edad ? ` <span style="white-space:nowrap">· ${esc(s.edad)} años</span>` : ""}</div><span class="state ${stCls}">${esc(stLabel)}</span></div>
+      <div class="cx-line">${esc(s.patologia || "Sin patología")}${s.cx ? ` <span>→</span> ${esc(s.cx)}` : ""}</div>
+      <div class="meta">${s.medico ? `<span>${esc(s.medico)}</span>` : ""}${s.dni ? `<span>DNI ${esc(s.dni)}</span>` : ""}${s.os ? `<span>${esc(s.os)}${s.afiliado ? " " + esc(s.afiliado) : ""}</span>` : ""}${s.fechaCx ? `<span>Cx ${esc(fmtShort(s.fechaCx))}</span>` : s.consulta ? `<span>1ª consulta ${esc(fmtShort(s.consulta))}</span>` : ""}${s.internado ? `<span class="tag">Internado${s.cama ? " · cama " + esc(s.cama) : ""}</span>` : ""}</div>
+      ${!s.operado && !s.cancelada ? `<div class="bar" aria-label="${all - miss.length} de ${all} pasos"><i style="width:${all ? Math.round(((all - miss.length) / all) * 100) : 0}%"></i></div>` : ""}
+      ${next.length ? `<div class="missing"><b>Falta:</b> ${esc(next.join(", ").toLowerCase())}${miss.length > 3 ? " y " + (miss.length - 3) + " más" : ""}</div>` : ""}
+      ${s.notas ? `<div class="cx-line"><span>${esc(s.notas)}</span></div>` : ""}
+    </button>`;
+  }
+
+  // ---------- Pendientes (de pacientes y propios) ----------
+  function todoRow(t) {
+    const p = t.pid && patientOf(t.pid);
+    const meta = [];
+    if (p) meta.push(`<span>${esc((p.cama ? p.cama + " · " : "") + p.nombre)}</span>`);
+    if (overdue(t)) meta.push(`<span class="late">Atrasado desde ${esc(dayLabel(t.date).toLowerCase())}</span>`);
+    else if (t.date !== today()) meta.push(`<span>${esc(dayLabel(t.date))}</span>`);
+    if (t.time) meta.push(`<span>${esc(t.time)}</span>`);
+    if (t.done && t.doneAt) meta.push(`<span>Hecho ${esc(t.doneAt.slice(11, 16))}</span>`);
+    return `<div class="item ${t.done ? "done" : ""}"><button class="check ${t.done ? "on" : ""}" data-act="toggle" data-id="${t.id}" aria-label="${t.done ? "Marcar como pendiente" : "Marcar como hecho"}"><span></span></button>
+      <div class="body"><div class="text">${esc(t.text)}</div>${meta.length ? `<div class="meta">${meta.join("")}</div>` : ""}</div>
+      <button class="more" data-act="edit-todo" data-id="${t.id}" aria-label="Editar">⋯</button></div>`;
+  }
+  const listOf = (arr, empty) => (arr.length ? `<div class="list">${arr.map(todoRow).join("")}</div>` : `<div class="empty">${empty}</div>`);
+  function viewTareas() {
+    const t = today();
+    const sortD = (a, b) => (a.date !== b.date ? (a.date < b.date ? -1 : 1) : byTime(a, b));
+    const open = S.todos.filter((x) => !x.done && x.date <= t).sort(sortD);
+    const next = S.todos.filter((x) => !x.done && x.date > t).sort(sortD);
+    const done = S.todos.filter((x) => x.done && x.doneAt && x.doneAt.slice(0, 10) === t).sort((a, b) => (a.doneAt < b.doneAt ? -1 : 1));
+    const pts = open.filter((x) => x.pid), mine = open.filter((x) => !x.pid);
+    return `
+      <header class="top"><div><div class="eyebrow">${esc(fmtLong(t))}</div><h1>Pendientes</h1></div>
+        <button class="add-btn" data-act="new-todo">${ICONS.plus}Agregar</button></header>
+      ${sampleNote()}
+      ${cxAlerts().length ? `<section class="block"><h2>Cirugías</h2><div class="stack" style="margin:0">${cxAlerts().map(alertCard).join("")}</div></section>` : ""}
+      <section class="block"><h2>De pacientes</h2>${listOf(pts, "Ningún pendiente de pacientes para hoy. Se cargan desde la ficha de cada internado.")}</section>
+      <section class="block"><h2>Míos</h2>
+        <form class="quick" id="quick" autocomplete="off"><input id="quick-text" placeholder="Anotar algo para hacer hoy…" aria-label="Anotar algo para hacer hoy"><button>Anotar</button></form>
+        ${mine.length ? listOf(mine, "") : ""}</section>
+      ${next.length ? `<section class="block"><h2>Próximos días</h2>${listOf(next, "")}</section>` : ""}
+      <section class="block"><h2>Hecho hoy</h2>${listOf(done, "Lo que marques como hecho aparece aquí con la hora.")}</section>`;
+  }
+
+  // ---------- Copia ----------
+  function viewCopia() {
+    const n = S.sample ? 0 : S.patients.length + S.surg.length;
+    return `<header class="top"><div><div class="eyebrow">${n} pacientes guardados</div><h1>Copia de seguridad</h1></div></header>
+      <div style="display:grid;gap:14px">
+        <div class="card"><h2>Guardar una copia</h2>
+          <p>Todo se guarda solo en este teléfono, no se sube a ningún lado. Guarda una copia una vez por semana (en Archivos o iCloud Drive) para no perder nada si cambias o pierdes el teléfono.</p>
+          <div class="btns"><button class="primary" data-act="export">Guardar copia</button></div></div>
+        <div class="card"><h2>Recuperar una copia</h2>
+          <p>Elige un archivo de copia guardado antes. Reemplaza lo que hay ahora en la app.</p>
+          <div class="btns"><label for="import-file">Elegir archivo…</label><input id="import-file" type="file" accept=".json,application/json" hidden></div></div>
+        <div class="card"><h2>Avisos</h2>
+          <p>Los pendientes con hora te avisan con una notificación mientras la app está abierta o recién usada. Al abrir la app cada día, también te avisa qué cirugías próximas tienen algo pendiente. Para un aviso seguro aunque el teléfono esté bloqueado, en cada pendiente toca <b>Aviso en el calendario del iPhone</b>: queda en Calendario con alarma a esa hora.</p>
+          <div class="btns"><button class="primary" data-act="notif" id="notif-btn">${notifLabel()}</button><button data-act="notif-test">Probar aviso</button></div></div>
+        <div class="card"><h2>Instalar en el iPhone</h2>
+          <ol class="steps"><li>Abre esta página en Safari.</li><li>Toca el botón Compartir (el cuadrado con la flecha).</li><li>Elige <b>Agregar a pantalla de inicio</b>.</li></ol>
+          <p>Después ábrela siempre desde ese ícono. Funciona sin internet.</p></div>
+      </div>`;
+  }
+
+  // ---------- render ----------
+  function render() {
+    $("#app").innerHTML = { pase: viewPase, cx: viewCx, tareas: viewTareas, copia: viewCopia }[tab]();
+    const openN = S.todos.filter((t) => !t.done && t.date <= today()).length + cxAlerts().length;
+    $("#tabs").innerHTML = TABS.map(([k, label]) =>
+      `<button data-tab="${k}" ${tab === k ? 'aria-current="page"' : ""}><span class="tabicon">${ICONS[k]}${k === "tareas" && openN ? `<span class="badge">${openN}</span>` : ""}</span>${label}</button>`).join("");
+    const pd = $("#pick-day"); if (pd) pd.addEventListener("change", () => { if (pd.value) { day = pd.value; render(); } });
+    const dd = $("#days button[aria-pressed=true]"); if (dd) { const c = $("#days"); c.scrollLeft = dd.offsetLeft - c.clientWidth / 2 + dd.clientWidth / 2; }
+    const s = $("#cx-search");
+    if (s) s.addEventListener("input", () => { cxQuery = s.value; const pos = s.selectionStart; render(); const n = $("#cx-search"); n.focus(); n.setSelectionRange(pos, pos); });
+    const f = $("#quick");
+    if (f) f.addEventListener("submit", (e) => {
+      e.preventDefault(); const v = $("#quick-text").value.trim(); if (!v) return;
+      realData(); S.todos.push({ id: uid(), pid: null, text: v, date: today(), time: "", done: false, doneAt: null });
+      save(); render(); toast("Anotado");
+    });
+    const imp = $("#import-file"); if (imp) imp.addEventListener("change", () => importFile(imp.files[0]));
+  }
+
+  // ---------- hojas ----------
+  function sheet(html, mount) {
+    const layer = $("#layer");
+    layer.innerHTML = `<div class="sheet-bg" data-close></div><form class="sheet" id="sheet" role="dialog" aria-modal="true" autocomplete="off" novalidate><div class="in"><div class="grab"></div>${html}</div></form>`;
+    layer.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", closeSheet));
+    if (mount) mount($("#sheet"));
+  }
+  function closeSheet() { $("#layer").innerHTML = ""; }
+  const val = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  const field = (id, label, v, type = "text", extra = "") => `<label class="f">${label}<input id="${id}" type="${type}" value="${esc(v)}" ${extra}></label>`;
+  const area = (id, label, v, cls = "") => `<label class="f">${label}<textarea id="${id}" class="${cls}">${esc(v)}</textarea></label>`;
+  function confirmBox(sheetEl, msg, okLabel, onOk) {
+    sheetEl.querySelectorAll(".confirm").forEach((x) => x.remove());
+    const box = document.createElement("div"); box.className = "confirm";
+    box.innerHTML = `<div>${esc(msg)}</div><div class="actions"><button type="button" data-no>Cancelar</button><button type="button" class="primary" data-yes>${esc(okLabel)}</button></div>`;
+    sheetEl.querySelector(".actions").before(box);
+    box.querySelector("[data-no]").onclick = () => box.remove();
+    box.querySelector("[data-yes]").onclick = onOk;
+    box.scrollIntoView({ block: "nearest" });
+  }
+
+  // Ficha del internado: novedades del día, pendientes, datos e historial.
+  function openPatient(p) {
+    const n = noteOf(p.id, day) || { controles: "", novedades: "" };
+    const prev = lastNoteBefore(p.id, day);
+    const pend = S.todos.filter((t) => t.pid === p.id && (t.date === day || (!t.done && t.date < day)));
+    const hist = S.notes.filter((x) => x.pid === p.id && x.date !== day).sort((a, b) => (a.date < b.date ? 1 : -1));
+    sheet(`
+      <h3>${esc((p.cama ? p.cama + " · " : "") + p.nombre)}</h3>
+      ${p.alergias ? `<div><span class="allergy">ALERGIA: ${esc(p.alergias.toUpperCase())}</span></div>` : ""}
+      <dl class="facts">
+        ${p.dx ? `<dt>Diagnóstico</dt><dd>${esc(p.dx)}</dd>` : ""}
+        ${p.app ? `<dt>APP</dt><dd>${esc(p.app)}</dd>` : ""}
+        ${p.medico ? `<dt>Médico</dt><dd>${esc(p.medico)}</dd>` : ""}
+        <dt>Datos</dt><dd>${esc([p.edad && p.edad + " años", p.dni && "DNI " + p.dni, p.os && p.os + (p.afiliado ? " " + p.afiliado : ""), p.contacto].filter(Boolean).join(" · ") || "–")}</dd>
+        <dt>Ingreso</dt><dd>${esc(fmtShort(p.ingreso))} (día ${diffDays(day, p.ingreso) + 1})${p.alta ? " · alta " + esc(fmtShort(p.alta)) : ""}</dd>
+      </dl>
+      <h4>${esc(fmtLong(day))}</h4>
+      ${area("n-controles", "Controles", n.controles)}
+      ${area("n-novedades", "Novedades (labo, imágenes, evolución)", n.novedades, "big")}
+      ${prev && !n.novedades ? `<button type="button" class="ghost-btn" id="copy-prev" style="justify-self:start">Copiar novedades de ${esc(dayLabel(prev.date).toLowerCase())}</button>` : ""}
+      <div class="f">Pendientes
+        ${pend.length ? `<div class="pend-row">${pend.map((t) => `<button type="button" class="pchip ${t.done ? "done" : ""}" data-tg="${t.id}"><span class="bx"></span>${esc(t.text)}</button>`).join("")}</div>` : ""}
+        <div class="quick"><input id="new-pend" placeholder="Ej: curar, labo mañana, alta" aria-label="Nuevo pendiente"><button type="button" id="add-pend">Agregar</button></div>
+      </div>
+      <div class="actions"><button type="button" data-close>Cerrar</button><button class="primary" type="submit">Guardar</button></div>
+      <div class="actions">
+        <button type="button" id="edit-pt">Editar datos</button>
+        ${p.alta ? `<button type="button" id="undo-alta">Quitar alta</button>` : `<button type="button" id="alta">Dar de alta</button>`}
+      </div>
+      <div class="f">Cirugías
+        ${surgOf(p.id).length ? `<div class="stack" style="margin:0">${surgOf(p.id).map(cxCard).join("")}</div>` : ""}
+        <button type="button" class="ghost-btn" id="add-cx" style="justify-self:start">Agregar cirugía</button>
+      </div>
+      ${hist.length ? `<h4>Otros días</h4><div class="hist">${hist.map((h) => `<div class="hist-day"><b>${esc(dayLabel(h.date))} · ${esc(fmtShort(h.date))}</b>${h.controles ? `<div>Controles: ${esc(h.controles)}</div>` : ""}${h.novedades ? `<div>${esc(h.novedades)}</div>` : ""}</div>`).join("")}</div>` : ""}
+    `, (el) => {
+      const keep = () => setNote(p.id, day, { controles: val("n-controles"), novedades: $("#n-novedades").value.trim() });
+      const reopen = () => { save(); render(); const top = $("#sheet").scrollTop; openPatient(p); $("#sheet").scrollTop = top; };
+      el.addEventListener("submit", (e) => { e.preventDefault(); keep(); save(); closeSheet(); render(); toast("Guardado"); });
+      const cp = $("#copy-prev"); if (cp) cp.onclick = () => { $("#n-novedades").value = prev.novedades; if (!val("n-controles")) $("#n-controles").value = prev.controles || ""; cp.remove(); };
+      const addP = () => { const v = val("new-pend"); if (!v) return; keep(); S.todos.push({ id: uid(), pid: p.id, text: v, date: day, time: "", done: false, doneAt: null }); reopen(); $("#new-pend").focus(); };
+      $("#add-pend").onclick = addP;
+      $("#new-pend").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addP(); } });
+      el.querySelectorAll("[data-tg]").forEach((b) => b.onclick = () => { keep(); toggleTodo(b.dataset.tg); reopen(); });
+      $("#edit-pt").onclick = () => { keep(); save(); render(); editPatient(p); };
+      $("#add-cx").onclick = () => { keep(); save(); render(); cxForm(null, p); };
+      el.querySelectorAll("[data-act=open-cx]").forEach((b) => b.onclick = () => { keep(); save(); render(); const c = S.surg.find((x) => x.id === b.dataset.id); if (c) cxForm(c, p); });
+      const al = $("#alta");
+      if (al) al.onclick = () => confirmBox(el, "¿Dar de alta a " + p.nombre + " el " + fmtShort(day) + "? Deja de aparecer desde el día siguiente y su historial queda guardado.", "Dar de alta", () => {
+        keep(); p.alta = day; save(); closeSheet(); render(); toast("Alta registrada", "Deshacer", () => { p.alta = null; save(); render(); });
+      });
+      const ua = $("#undo-alta"); if (ua) ua.onclick = () => { keep(); p.alta = null; save(); closeSheet(); render(); toast("Alta quitada"); };
+    });
+  }
+
+  function editPatient(p, q = "") {
+    const isNew = !p;
+    const d = p || { cama: "", nombre: /\d{5,}/.test(q) ? "" : q, edad: "", dni: /\d{5,}/.test(q) ? q : "", os: "IOSFA", afiliado: "", contacto: "", medico: "", app: "", alergias: "", dx: "", ingreso: day, alta: null };
+    sheet(`
+      <h3>${isNew ? "Nuevo internado" : "Datos del paciente"}</h3>
+      <div class="row2">${field("p-cama", "Habitación / cama", d.cama)}${field("p-edad", "Edad", d.edad, "text", 'inputmode="numeric"')}</div>
+      ${field("p-nombre", "Apellido y nombre", d.nombre, "text", 'autocapitalize="words"')}
+      <div class="row2">${field("p-dni", "DNI", d.dni, "text", 'inputmode="numeric"')}${field("p-medico", "Médico a cargo", d.medico)}</div>
+      <div class="row2">${field("p-os", "Obra social", d.os)}${field("p-afiliado", "N° de afiliado", d.afiliado)}</div>
+      ${field("p-contacto", "Contacto", d.contacto, "tel")}
+      ${field("p-alergias", "Alergias", d.alergias)}
+      ${area("p-app", "APP (antecedentes)", d.app)}
+      ${area("p-dx", "Diagnóstico / cirugía", d.dx)}
+      ${field("p-ingreso", "Fecha de ingreso", d.ingreso || day, "date")}
+      <div class="actions">${isNew ? "" : `<button type="button" class="danger" id="del">Borrar</button>`}<button type="button" data-close>Cancelar</button><button class="primary" type="submit">Guardar</button></div>
+    `, (el) => {
+      el.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const nombre = val("p-nombre"); if (!nombre) { $("#p-nombre").focus(); toast("Falta el nombre"); return; }
+        const data = { cama: val("p-cama"), nombre, edad: val("p-edad"), dni: val("p-dni"), medico: val("p-medico"), os: val("p-os"), afiliado: val("p-afiliado"), contacto: val("p-contacto"), alergias: val("p-alergias"), app: val("p-app"), dx: val("p-dx"), ingreso: val("p-ingreso") || today() };
+        if (isNew) { realData(); const np = Object.assign({ id: uid(), alta: null }, data); S.patients.push(np); if (np.ingreso > day) day = np.ingreso; save(); render(); openPatient(np); toast("Paciente agregado"); }
+        else { Object.assign(p, data); save(); render(); openPatient(p); toast("Datos guardados"); }
+      });
+      const del = $("#del");
+      if (del) del.onclick = () => confirmBox(el, "¿Borrar a " + p.nombre + " con todas sus novedades, pendientes y cirugías? Si se fue de alta, mejor usa Dar de alta.", "Borrar", () => {
+        const snap = JSON.stringify(S);
+        S.patients = S.patients.filter((x) => x !== p); S.notes = S.notes.filter((x) => x.pid !== p.id); S.todos = S.todos.filter((x) => x.pid !== p.id); S.surg = S.surg.filter((x) => x.pid !== p.id);
+        save(); closeSheet(); render(); toast("Paciente borrado", "Deshacer", () => { S = JSON.parse(snap); save(); render(); });
+      });
+    });
+  }
+
+  // Paso 1: buscar al paciente. Elegir uno trae sus datos; si no está, se crea nuevo.
+  function pickPatient(title, onPick) {
+    sheet(`
+      <h3>${esc(title)}</h3>
+      <label class="f">Buscar paciente por apellido, nombre o DNI<input id="pk-q" type="search" placeholder="Ej: Pérez o 10000001" autocomplete="off"></label>
+      <div id="pk-res" class="list"></div>
+      <div class="actions"><button type="button" data-close>Cancelar</button><button type="button" class="primary" id="pk-new">Paciente nuevo</button></div>
+    `, (el) => {
+      el.addEventListener("submit", (e) => e.preventDefault());
+      const draw = () => {
+        const q = norm(val("pk-q")).trim();
+        const all = S.patients.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+        const res = (q ? all.filter((p) => norm(p.nombre + " " + p.dni + " " + p.afiliado).includes(q)) : all).slice(0, 30);
+        $("#pk-res").innerHTML = res.length ? res.map((p) => {
+          const info = [p.dni && "DNI " + p.dni, p.edad && p.edad + " años", p.os].filter(Boolean).join(" · ");
+          const where = isInternado(p) ? "Internado" + (p.cama ? " · cama " + p.cama : "") : surgOf(p.id).length ? surgOf(p.id).length + (surgOf(p.id).length === 1 ? " cirugía" : " cirugías") : "";
+          return `<button type="button" class="item" data-pick="${p.id}" style="grid-template-columns:1fr auto;text-align:left;background:none;border-left:0;border-right:0;border-bottom:0;width:100%;padding:10px 12px">
+            <div class="body" style="padding:0"><div class="text" style="font-weight:600">${esc(p.nombre)}</div><div class="meta">${esc(info)}${where ? `<span class="tag">${esc(where)}</span>` : ""}</div></div><span style="color:var(--muted);align-self:center">›</span></button>`;
+        }).join("") : `<div class="empty" style="border:0">${q ? "No hay ningún paciente con ese nombre o DNI. Toca <b>Paciente nuevo</b> para cargarlo." : "Todavía no hay pacientes cargados. Toca <b>Paciente nuevo</b>."}</div>`;
+        $("#pk-res").querySelectorAll("[data-pick]").forEach((b) => b.onclick = () => onPick(patientOf(b.dataset.pick), ""));
+      };
+      $("#pk-q").addEventListener("input", draw);
+      $("#pk-new").onclick = () => onPick(null, val("pk-q"));
+      draw(); setTimeout(() => $("#pk-q").focus(), 50);
+    });
+  }
+
+  function editCx(s) {
+    if (s) cxForm(s, patientOf(s.pid));
+    else pickPatient("Cirugía nueva", (p, q) => cxForm(null, p, q));
+  }
+
+  // Paso 2: datos del paciente (ya completos si se eligió uno) y de la cirugía, vinculada a ese paciente.
+  function cxForm(s, p, q = "") {
+    const isNew = !s;
+    const d = s || { medico: (p && p.medico) || "", patologia: (p && p.dx) || "", cx: "", consulta: today(), fechaCx: "", operado: false, cancelada: false, sinMateriales: false, notas: "", steps: {}, extra: [] };
+    const steps = Object.assign({}, d.steps || {}), extra = (d.extra || []).map((x) => Object.assign({}, x));
+    let sinMat = !!d.sinMateriales;
+    const pd = p || { nombre: /\d{5,}/.test(q) ? "" : q, dni: /\d{5,}/.test(q) ? q : "", edad: "", os: "IOSFA", afiliado: "", contacto: "", app: "", alergias: "" };
+    const tel = (pd.contacto || "").split("/")[0].replace(/[^\d+]/g, "");
+    sheet(`
+      <h3>${isNew ? "Cirugía nueva" : "Cirugía"}${p ? " · " + esc(p.nombre) : ""}</h3>
+      ${p && p.alergias ? `<div><span class="allergy">ALERGIA: ${esc(p.alergias.toUpperCase())}</span></div>` : ""}
+      <h4>Paciente${p ? "" : " nuevo"}</h4>
+      ${field("c-nombre", "Apellido y nombre", pd.nombre, "text", 'autocapitalize="words"')}
+      <div class="row3">${field("c-dni", "DNI", pd.dni, "text", 'inputmode="numeric"')}${field("c-edad", "Edad", pd.edad, "text", 'inputmode="numeric"')}${field("c-os", "Obra social", pd.os)}</div>
+      <div class="row2">${field("c-afiliado", "N° de afiliado", pd.afiliado)}${field("c-contacto", "Contacto", pd.contacto, "tel")}</div>
+      ${field("c-alergias", "Alergias", pd.alergias)}
+      ${p && tel ? `<a class="ghost-btn tel" href="tel:${esc(tel)}">Llamar al ${esc(tel)}</a>` : ""}
+      ${p ? `<p style="margin:-4px 0 0;font-size:13px;color:var(--muted)">Si cambias estos datos, se actualizan también en su ficha.</p>` : ""}
+      <h4>Cirugía</h4>
+      ${field("c-patologia", "Patología", d.patologia)}
+      <div class="row2">${field("c-cx", "Cirugía", d.cx)}${field("c-medico", "Médico", d.medico)}</div>
+      <div class="row2">${field("c-consulta", "1ª consulta", d.consulta, "date")}${field("c-fecha", "Fecha de cirugía", d.fechaCx, "date")}</div>
+      <h4>Circuito</h4>
+      <div class="steps-box" id="steps"></div>
+      <div class="quick"><input id="c-extra" placeholder="Agregar otro paso (ej: riesgo con clínica)" aria-label="Agregar otro paso"><button type="button" id="c-extra-add">Agregar</button></div>
+      <label class="switch"><input type="checkbox" id="c-sinmat" ${sinMat ? "checked" : ""}>No lleva materiales</label>
+
+      ${area("c-notas", "Notas", d.notas)}
+      <div class="actions">${isNew ? "" : `<button type="button" class="danger" id="del">Borrar</button>`}<button type="button" data-close>Cancelar</button><button class="primary" type="submit">Guardar</button></div>
+      ${isNew ? "" : `<div class="actions"><button type="button" id="mark-op">${d.operado ? "Volver a pendientes" : "Marcar como operado"}</button>${p && isInternado(p) ? `<button type="button" id="go-pt">Ver internación</button>` : `<button type="button" id="internar">Internar hoy</button>`}</div>
+      <div class="actions"><button type="button" id="cx-cal">Recordatorios en el calendario</button><button type="button" id="cancel-cx">${d.cancelada ? "Reactivar" : "Cancelar cirugía"}</button></div>`}
+    `, (el) => {
+      const drawSteps = () => {
+        $("#steps").innerHTML = STEP_GROUPS.map(([g, list]) => `<div class="step-group"><div class="lbl">${g}</div>${list.map(([k, l]) => {
+          const off = sinMat && MAT.includes(k);
+          return `<button type="button" class="step ${steps[k] ? "on" : ""} ${off ? "off-row" : ""}" data-step="${k}" ${off ? "disabled" : ""}><span class="ck"></span><span>${l}</span><small>${steps[k] ? esc(fmtShort(steps[k]).slice(0, 5)) : off ? "no lleva" : ""}</small></button>`;
+        }).join("")}</div>`).join("") + (extra.length ? `<div class="step-group"><div class="lbl">Otros</div>${extra.map((x, i) => `<button type="button" class="step ${x.done ? "on" : ""}" data-extra="${i}"><span class="ck"></span><span>${esc(x.text)}</span><small>${x.done ? "" : ""}</small></button>`).join("")}</div>` : "");
+        $("#steps").querySelectorAll("[data-step]").forEach((b) => b.onclick = () => { const k = b.dataset.step; if (steps[k]) delete steps[k]; else steps[k] = today(); drawSteps(); });
+        $("#steps").querySelectorAll("[data-extra]").forEach((b) => b.onclick = () => { const x = extra[+b.dataset.extra]; x.done = !x.done; drawSteps(); });
+      };
+      drawSteps();
+      const addExtra = () => { const v = val("c-extra"); if (!v) return; extra.push({ text: v, done: false }); $("#c-extra").value = ""; drawSteps(); };
+      $("#c-extra-add").onclick = addExtra;
+      $("#c-extra").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addExtra(); } });
+      $("#c-sinmat").onchange = () => { sinMat = $("#c-sinmat").checked; drawSteps(); };
+      const person = () => ({ nombre: val("c-nombre"), dni: val("c-dni"), edad: val("c-edad"), os: val("c-os"), afiliado: val("c-afiliado"), contacto: val("c-contacto"), alergias: val("c-alergias") });
+      const cxData = () => ({ medico: val("c-medico"), patologia: val("c-patologia"), cx: val("c-cx"), consulta: val("c-consulta"), fechaCx: val("c-fecha"), notas: val("c-notas"), steps: Object.assign({}, steps), extra: extra.map((x) => Object.assign({}, x)), sinMateriales: sinMat });
+      // Guarda paciente y cirugía; devuelve [paciente, cirugía] o null si falta el nombre.
+      const commit = () => {
+        const pdata = person(); if (!pdata.nombre) { $("#c-nombre").focus(); toast("Falta el nombre"); return null; }
+        let pt = p;
+        if (!pt) { realData(); pt = Object.assign({ id: uid(), cama: "", medico: val("c-medico"), app: "", dx: "", ingreso: null, alta: null }, pdata); S.patients.push(pt); }
+        else Object.assign(pt, pdata);
+        let c = s;
+        if (!c) { c = Object.assign({ id: uid(), pid: pt.id, operado: false, cancelada: false }, cxData()); S.surg.push(c); }
+        else Object.assign(c, cxData(), { pid: pt.id });
+        return [pt, c];
+      };
+      el.addEventListener("submit", (e) => { e.preventDefault(); if (!commit()) return; save(); closeSheet(); render(); toast(isNew ? "Cirugía agregada" : "Guardado"); });
+      const mo = $("#mark-op");
+      if (mo) mo.onclick = () => {
+        if (!commit()) return;
+        s.operado = !s.operado; if (s.operado && !s.fechaCx) s.fechaCx = today();
+        save(); closeSheet(); render(); toast(s.operado ? "Pasó a operados" : "Volvió a pendientes", "Deshacer", () => { s.operado = !s.operado; save(); render(); });
+      };
+      const cc = $("#cancel-cx"); if (cc) cc.onclick = () => { if (!commit()) return; s.cancelada = !s.cancelada; save(); closeSheet(); render(); toast(s.cancelada ? "Cirugía cancelada" : "Cirugía reactivada", "Deshacer", () => { s.cancelada = !s.cancelada; save(); render(); }); };
+      const cal = $("#cx-cal"); if (cal) cal.onclick = () => { const r = commit(); if (!r) return; save(); render(); cxCalendar(r[1], r[0]); };
+      const gp = $("#go-pt"); if (gp) gp.onclick = () => { if (!commit()) return; save(); tab = "pase"; day = today(); render(); openPatient(p); };
+      const it = $("#internar");
+      if (it) it.onclick = () => {
+        const r = commit(); if (!r) return; const [pt, c] = r;
+        pt.ingreso = today(); pt.alta = null; if (!pt.dx) pt.dx = c.cx || c.patologia; if (!pt.medico) pt.medico = c.medico;
+        save(); tab = "pase"; day = today(); render(); editPatient(pt); toast("Internado hoy. Completa la cama");
+      };
+      const del = $("#del");
+      if (del) del.onclick = () => confirmBox(el, "¿Borrar esta cirugía de " + (p ? p.nombre : "este paciente") + "? Los datos del paciente quedan guardados.", "Borrar", () => {
+        const i = S.surg.indexOf(s); S.surg.splice(i, 1); save(); closeSheet(); render();
+        toast("Cirugía borrada", "Deshacer", () => { S.surg.splice(i, 0, s); save(); render(); });
+      });
+    });
+  }
+
+  function editTodo(t) {
+    const isNew = !t;
+    const d = t || { pid: null, text: "", date: today(), time: "" };
+    const pts = internadosEn(today());
+    if (d.pid && !pts.some((p) => p.id === d.pid) && patientOf(d.pid)) pts.push(patientOf(d.pid));
+    sheet(`
+      <h3>${isNew ? "Nuevo pendiente" : "Editar pendiente"}</h3>
+      ${area("t-text", "Qué hay que hacer", d.text)}
+      <div class="row2">${field("t-date", "Fecha", d.date, "date")}${field("t-time", "Hora (opcional)", d.time, "time")}</div>
+      <label class="f">Paciente (opcional)<select id="t-pid"><option value="">Ninguno, es mío</option>${pts.map((p) => `<option value="${p.id}" ${p.id === d.pid ? "selected" : ""}>${esc((p.cama ? p.cama + " · " : "") + p.nombre)}</option>`).join("")}</select></label>
+      <div class="actions">${isNew ? "" : `<button type="button" class="danger" id="del">Borrar</button>`}<button type="button" data-close>Cancelar</button><button class="primary" type="submit">Guardar</button></div>
+      <div class="actions"><button type="button" id="t-cal">Aviso en el calendario del iPhone</button></div>
+    `, (el) => {
+      const collect = () => ({ text: val("t-text"), date: val("t-date") || today(), time: val("t-time"), pid: val("t-pid") || null });
+      el.addEventListener("submit", (e) => {
+        e.preventDefault(); const data = collect(); if (!data.text) { $("#t-text").focus(); return; }
+        if (isNew) { realData(); S.todos.push(Object.assign({ id: uid(), done: false, doneAt: null }, data)); } else Object.assign(t, data);
+        save(); closeSheet(); render(); scheduleAlerts();
+        if (data.time && data.date >= today()) toast("Guardado. Te aviso a las " + data.time + " si la app está abierta", "Calendario", () => addToCalendar(data));
+        else toast("Guardado");
+      });
+      $("#t-cal").onclick = () => { const data = collect(); if (!data.text) { $("#t-text").focus(); return; } if (!data.time) { $("#t-time").focus(); toast("Elige una hora para el aviso"); return; } addToCalendar(data); };
+      const del = $("#del");
+      if (del) del.onclick = () => { const i = S.todos.indexOf(t); S.todos.splice(i, 1); save(); closeSheet(); render(); toast("Borrado", "Deshacer", () => { S.todos.splice(i, 0, t); save(); render(); }); };
+    });
+  }
+
+  function toggleTodo(id) {
+    const t = S.todos.find((x) => x.id === id); if (!t) return null;
+    t.done = !t.done; t.doneAt = t.done ? today() + "T" + nowHM() : null;
+    return t;
+  }
+
+  // ---------- compartir el pase ----------
+  async function sharePase() {
+    const lines = ["Pase " + fmtShort(day), ""];
+    internadosEn(day).forEach((p) => {
+      const n = noteOf(p.id, day);
+      const pend = S.todos.filter((t) => t.pid === p.id && !t.done && t.date <= day).map((t) => t.text);
+      lines.push(`*${p.cama ? p.cama + " " : ""}${p.nombre}*${p.edad ? " " + p.edad + "a" : ""}${p.medico ? " - " + p.medico : ""}`);
+      if (p.alergias) lines.push("ALERGIA: " + p.alergias.toUpperCase());
+      if (p.app) lines.push("APP: " + p.app);
+      if (p.dx) lines.push("Dx: " + p.dx);
+      if (n && n.controles) lines.push("Controles: " + n.controles);
+      if (n && n.novedades) lines.push(n.novedades);
+      if (pend.length) lines.push("Pendientes: " + pend.join(", "));
+      lines.push("");
+    });
+    const text = lines.join("\n").trim();
+    try { if (navigator.share) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === "AbortError") return; }
+    try { await navigator.clipboard.writeText(text); toast("Pase copiado, ya puedes pegarlo"); }
+    catch (e) { sheet(`<h3>Pase del día</h3><label class="f">Mantén apretado para copiar<textarea class="big" readonly>${esc(text)}</textarea></label><div class="actions"><button type="button" data-close>Cerrar</button></div>`); }
+  }
+
+  // ---------- copia de seguridad ----------
+  async function exportData() {
+    if (S.sample) { toast("Todavía no hay datos propios para guardar"); return; }
+    const data = JSON.stringify({ app: "bitacora-camila", version: 3, exportedAt: new Date().toISOString(), patients: S.patients, notes: S.notes, todos: S.todos, surg: S.surg });
+    const name = "bitacora-" + today() + ".json";
+    const file = new File([data], name, { type: "application/json" });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "Copia de la bitácora" }); toast("Copia lista"); return; }
+    } catch (e) { if (e && e.name === "AbortError") return; }
+    try {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast("Copia guardada");
+    } catch (e) { toast("No se pudo guardar la copia en este navegador"); }
+  }
+  function importFile(f) {
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const o = JSON.parse(r.result);
+        if (!o || o.app !== "bitacora-camila" || !Array.isArray(o.patients) || !Array.isArray(o.surg)) throw new Error("formato");
+        const prev = S;
+        S = migrate({ patients: o.patients, notes: o.notes || [], todos: o.todos || [], surg: o.surg, sample: false });
+        save(); tab = "pase"; day = today(); render();
+        toast("Copia recuperada", "Deshacer", () => { S = prev; save(); render(); });
+      } catch (e) { toast("Ese archivo no es una copia de la bitácora"); }
+    };
+    r.readAsText(f);
+  }
+
+  // ---------- eventos ----------
+  document.addEventListener("click", (e) => {
+    const tb = e.target.closest("[data-tab]");
+    if (tb) { tab = tb.dataset.tab; render(); window.scrollTo(0, 0); return; }
+    if (!e.target.closest("#app")) return;
+    const dy = e.target.closest("[data-day]"); if (dy) { day = dy.dataset.day; render(); return; }
+    const ct = e.target.closest("[data-cxtab]"); if (ct) { cxTab = ct.dataset.cxtab; render(); return; }
+    const cf = e.target.closest("[data-cxf]"); if (cf) { cxFilter = cf.dataset.cxf; render(); return; }
+    const a = e.target.closest("[data-act]"); if (!a) return;
+    const id = a.dataset.id;
+    switch (a.dataset.act) {
+      case "new-pt": pickPatient("Internar paciente", (p, q) => {
+        if (!p) return editPatient(null, q);
+        if (isInternado(p) && day >= p.ingreso) { openPatient(p); return; }
+        p.ingreso = day; p.alta = null; if (!p.dx) { const c = surgOf(p.id).find((x) => !x.operado); if (c) p.dx = c.cx || c.patologia; }
+        save(); render(); editPatient(p); toast("Completa la cama y el diagnóstico");
+      }); break;
+      case "open-pt": { const p = patientOf(id); if (p) openPatient(p); break; }
+      case "new-cx": editCx(null); break;
+      case "open-cx": { const s = S.surg.find((x) => x.id === id); if (s) editCx(s); break; }
+      case "new-todo": editTodo(null); break;
+      case "edit-todo": { const t = S.todos.find((x) => x.id === id); if (t) editTodo(t); break; }
+      case "toggle": { const t = toggleTodo(id); save(); render(); if (t && t.done) toast("Hecho", "Deshacer", () => { toggleTodo(id); save(); render(); }); break; }
+      case "share-pase": sharePase(); break;
+      case "clear-sample": S = blank(); save(); render(); break;
+      case "export": exportData(); break;
+      case "notif": askNotif(); break;
+      case "notif-test": notify("Así se ve un aviso", "Bitácora de Camila"); break;
+    }
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
+
+  let toastTimer;
+  function toast(msg, actLabel, act) {
+    document.querySelectorAll(".toast").forEach((t) => t.remove());
+    const t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status");
+    t.innerHTML = `<span>${esc(msg)}</span>${actLabel ? `<button>${esc(actLabel)}</button>` : ""}`;
+    if (actLabel) t.querySelector("button").onclick = () => { act(); t.remove(); };
+    document.body.appendChild(t);
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), actLabel ? 6000 : 2200);
+  }
+
+  // Al volver a la app otro día, salta a hoy.
+  let lastDay = today();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && today() !== lastDay) { if (day === lastDay) day = today(); lastDay = today(); render(); } });
+
+  // ---------- avisos ----------
+  const canNotify = () => "Notification" in window;
+  function notifLabel() {
+    if (!canNotify()) return "Avisos: instala la app primero";
+    return Notification.permission === "granted" ? "Avisos activados" : Notification.permission === "denied" ? "Avisos bloqueados en Ajustes" : "Activar avisos";
+  }
+  async function askNotif() {
+    if (!canNotify()) { toast("En iPhone los avisos funcionan con la app agregada a la pantalla de inicio"); return; }
+    if (Notification.permission === "denied") { toast("Actívalos en Ajustes > Notificaciones > Bitácora"); return; }
+    try { await Notification.requestPermission(); } catch (e) {}
+    render(); scheduleAlerts();
+    if (Notification.permission === "granted") toast("Avisos activados");
+  }
+  async function notify(body, title = "Pendiente") {
+    if (canNotify() && Notification.permission === "granted") {
+      try {
+        const reg = navigator.serviceWorker && (await navigator.serviceWorker.getRegistration());
+        if (reg) { await reg.showNotification(title, { body, icon: "icons/icon-192.png", tag: body }); return; }
+        new Notification(title, { body }); return;
+      } catch (e) {}
+    }
+    toast(title + ": " + body);
+  }
+  // Programa los avisos de hoy para pendientes con hora (funcionan mientras la app sigue viva).
+  let alertTimers = [];
+  function scheduleAlerts() {
+    alertTimers.forEach(clearTimeout); alertTimers = [];
+    if (S.sample) return;
+    const now = Date.now(), t = today();
+    S.todos.filter((x) => !x.done && x.time && x.date === t).forEach((x) => {
+      const [h, m] = x.time.split(":").map(Number); const at = parseYmd(t); at.setHours(h, m, 0, 0);
+      const ms = at - now; if (ms < 0) return;
+      alertTimers.push(setTimeout(() => {
+        const cur = S.todos.find((y) => y.id === x.id); if (!cur || cur.done) return;
+        const p = cur.pid && patientOf(cur.pid);
+        notify((p && p.cama ? "Cama " + p.cama + ": " : "") + cur.text, "Pendiente " + cur.time);
+      }, ms));
+    });
+  }
+  // Crea un evento con alarma para la app Calendario. Solo lleva la cama, no el nombre del paciente.
+  // Recordatorios de una cirugía: controlar a los 7 días de dar los prequirúrgicos, y el día anterior a la fecha de cirugía.
+  function cxCalendar(c, p) {
+    const ini = (p.nombre || "").split(/[ ,]+/).filter((w) => /^[a-záéíóúñü]/i.test(w)).map((w) => w[0].toUpperCase()).join("");
+    const what = (c.cx || c.patologia || "cirugía") + (ini ? " (" + ini + ")" : "");
+    const evs = [];
+    if (c.fechaCx) {
+      const prev = addDays(c.fechaCx, -1);
+      if (prev >= today()) evs.push({ date: prev, time: "08:00", text: "Mañana se opera " + what + ": revisar autorización y materiales" });
+      if (c.fechaCx >= today()) evs.push({ date: c.fechaCx, time: "07:00", text: "Hoy se opera " + what });
+    }
+    if (!PRE.every((k) => isDone(c, k))) evs.push({ date: addDays(today(), 7), time: "09:00", text: "Controlar prequirúrgicos de " + what });
+    if (!evs.length) { toast("Pon una fecha de cirugía para crear los recordatorios"); return; }
+    icsDownload(evs);
+  }
+  function addToCalendar(d) {
+    const p = d.pid && patientOf(d.pid);
+    icsDownload([{ date: d.date, time: d.time, text: (p && p.cama ? "Cama " + p.cama + ": " : "") + d.text }]);
+  }
+  function icsDownload(evs) {
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
+    const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Bitacora de Camila//ES"];
+    evs.forEach((d) => {
+      const title = d.text.replace(/[\\,;]/g, (c) => "\\" + c).replace(/\n/g, " ");
+      const dt = d.date.replace(/-/g, "") + "T" + d.time.replace(":", "") + "00";
+      const [h, m] = d.time.split(":").map(Number); const end = new Date(parseYmd(d.date)); end.setHours(h, m + 15);
+      const dtEnd = ymd(end).replace(/-/g, "") + "T" + pad(end.getHours()) + pad(end.getMinutes()) + "00";
+      lines.push("BEGIN:VEVENT", "UID:" + uid() + "@bitacora", "DTSTAMP:" + stamp, "DTSTART:" + dt, "DTEND:" + dtEnd, "SUMMARY:" + title, "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + title, "TRIGGER:PT0M", "END:VALARM", "END:VEVENT");
+    });
+    lines.push("END:VCALENDAR");
+    const ics = lines.join("\r\n");
+    try {
+      const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+      const a = document.createElement("a"); a.href = url; a.download = "aviso.ics";
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) { toast("No se pudo crear el aviso en este navegador"); }
+  }
+  // Una vez por día, al abrir la app, avisa las cirugías próximas a las que les falta algo.
+  function cxDailyNotice() {
+    if (S.sample) return;
+    const urgent = cxAlerts().filter((a) => a.urgent);
+    if (!urgent.length) return;
+    let last = ""; try { last = localStorage.getItem(KEY + "-aviso-cx") || ""; } catch (e) {}
+    if (last === today()) return;
+    try { localStorage.setItem(KEY + "-aviso-cx", today()); } catch (e) {}
+    notify(urgent.map((a) => a.p.nombre.split(",")[0] + ": " + a.text).join("\n"), urgent.length === 1 ? "Una cirugía necesita algo" : urgent.length + " cirugías necesitan algo");
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { scheduleAlerts(); cxDailyNotice(); } });
+
+  load(); render(); scheduleAlerts(); setTimeout(cxDailyNotice, 1500);
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+  //SW-START
+  if ("serviceWorker" in navigator && window.isSecureContext) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+  //SW-END
+})();
+</script>
+</body>
+</html>
