@@ -367,9 +367,9 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
         { id: uid(), pid: null, text: "Firmar epicrisis", date: t, time: "13:00", done: false, doneAt: null },
       ],
       surg: [
-        { id: uid(), pid: p1.id, medico: "Dr. Gómez", patologia: "Fractura de cadera derecha", cx: "Osteosíntesis de cadera", consulta: addDays(t, -3), fechaCx: addDays(t, 1), operado: false, notas: "",
+        { id: uid(), pid: p1.id, medico: "Dr. Gómez", patologia: "Fractura de cadera derecha", cx: "Osteosíntesis de cadera", consulta: addDays(t, -3), fechaCx: addDays(t, 1), horaCx: "10:00", operado: false, notas: "",
           steps: { pre: addDays(t, -3), turnos: addDays(t, -3), lab: addDays(t, -2), ecg: addDays(t, -1), rx: addDays(t, -2), anest: addDays(t, -1), admision: addDays(t, -1), quirofano: addDays(t, -1), pedido: addDays(t, -1) }, extra: [] },
-        { id: uid(), pid: p3.id, medico: "Dr. Gómez", patologia: "Síndrome de túnel carpiano", cx: "Liberación túnel carpiano", consulta: addDays(t, -20), fechaCx: addDays(t, 6), operado: false, notas: "", sinMateriales: true,
+        { id: uid(), pid: p3.id, medico: "Dr. Gómez", patologia: "Síndrome de túnel carpiano", cx: "Liberación túnel carpiano", consulta: addDays(t, -20), fechaCx: addDays(t, 6), horaCx: "08:30", operado: false, notas: "", sinMateriales: true,
           steps: { pre: addDays(t, -20), turnos: addDays(t, -19), lab: addDays(t, -15), ecg: addDays(t, -15), rx: addDays(t, -15), anest: addDays(t, -10), admision: addDays(t, -8), quirofano: addDays(t, -2), autCx: addDays(t, -5) }, extra: [] },
         { id: uid(), pid: p4.id, medico: "Dra. Ruiz", patologia: "Gonartrosis izquierda", cx: "RTR", consulta: addDays(t, -9), fechaCx: "", operado: false, notas: "",
           steps: { pre: addDays(t, -9), turnos: addDays(t, -8), lab: addDays(t, -6) }, extra: [{ text: "Riesgo quirúrgico con clínica", done: false }] },
@@ -394,7 +394,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     const miss = missingOf(c);
     const days = c.fechaCx ? diffDays(c.fechaCx, today()) : null;
     if (days !== null && days <= 3 && miss.length) return ["alerta", days < 0 ? "Fecha pasada" : days === 0 ? "Hoy · falta algo" : days === 1 ? "Mañana · falta algo" : "En " + days + " días · falta algo", "urgente"];
-    if (isDone(c, "quirofano")) return ["prog", c.fechaCx ? "Programada " + fmtShort(c.fechaCx).slice(0, 5) : "En quirófano", miss.length ? "falta" : "prog"];
+    if (isDone(c, "quirofano")) return ["prog", c.fechaCx ? "Programada " + fmtShort(c.fechaCx).slice(0, 5) + (c.horaCx ? " " + c.horaCx : "") : "En quirófano", miss.length ? "falta" : "prog"];
     if (isDone(c, "admision")) return ["quiro", "Cargar en quirófano", "tramite"];
     if (PRE.every((k) => isDone(c, k))) return ["adm", "Cargar en admisión", "admision"];
     return ["pre", "Prequirúrgicos " + PRE.filter((k) => isDone(c, k)).length + "/" + PRE.length, ""];
@@ -528,7 +528,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     return `<button class="cx" data-act="open-cx" data-id="${s.id}">
       <div class="cx-top"><div class="cx-name">${esc(s.nombre)}${s.edad ? ` <span style="white-space:nowrap">· ${esc(s.edad)} años</span>` : ""}</div><span class="state ${stCls}">${esc(stLabel)}</span></div>
       <div class="cx-line">${esc(s.patologia || "Sin patología")}${s.cx ? ` <span>→</span> ${esc(s.cx)}` : ""}</div>
-      <div class="meta">${s.medico ? `<span>${esc(s.medico)}</span>` : ""}${s.dni ? `<span>DNI ${esc(s.dni)}</span>` : ""}${s.os ? `<span>${esc(s.os)}${s.afiliado ? " " + esc(s.afiliado) : ""}</span>` : ""}${s.fechaCx ? `<span>Cx ${esc(fmtShort(s.fechaCx))}</span>` : s.consulta ? `<span>1ª consulta ${esc(fmtShort(s.consulta))}</span>` : ""}${s.internado ? `<span class="tag">Internado${s.cama ? " · cama " + esc(s.cama) : ""}</span>` : ""}</div>
+      <div class="meta">${s.medico ? `<span>${esc(s.medico)}</span>` : ""}${s.dni ? `<span>DNI ${esc(s.dni)}</span>` : ""}${s.os ? `<span>${esc(s.os)}${s.afiliado ? " " + esc(s.afiliado) : ""}</span>` : ""}${s.fechaCx ? `<span>Cx ${esc(fmtShort(s.fechaCx))}${s.horaCx ? " " + esc(s.horaCx) : ""}</span>` : s.consulta ? `<span>1ª consulta ${esc(fmtShort(s.consulta))}</span>` : ""}${s.internado ? `<span class="tag">Internado${s.cama ? " · cama " + esc(s.cama) : ""}</span>` : ""}</div>
       ${!s.operado && !s.cancelada ? `<div class="bar" aria-label="${all - miss.length} de ${all} pasos"><i style="width:${all ? Math.round(((all - miss.length) / all) * 100) : 0}%"></i></div>` : ""}
       ${next.length ? `<div class="missing"><b>Falta:</b> ${esc(next.join(", ").toLowerCase())}${miss.length > 3 ? " y " + (miss.length - 3) + " más" : ""}</div>` : ""}
       ${s.notas ? `<div class="cx-line"><span>${esc(s.notas)}</span></div>` : ""}
@@ -768,7 +768,8 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       <h4>Cirugía</h4>
       ${field("c-patologia", "Patología", d.patologia)}
       <div class="row2">${field("c-cx", "Cirugía", d.cx)}${field("c-medico", "Médico", d.medico)}</div>
-      <div class="row2">${field("c-consulta", "1ª consulta", d.consulta, "date")}${field("c-fecha", "Fecha de cirugía", d.fechaCx, "date")}</div>
+      <div class="row2">${field("c-fecha", "Fecha de cirugía *", d.fechaCx, "date")}${field("c-hora", "Hora de cirugía *", d.horaCx || "", "time")}</div>
+      ${field("c-consulta", "1ª consulta", d.consulta, "date")}
       <h4>Circuito</h4>
       <div class="steps-box" id="steps"></div>
       <div class="quick"><input id="c-extra" placeholder="Agregar otro paso (ej: riesgo con clínica)" aria-label="Agregar otro paso"><button type="button" id="c-extra-add">Agregar</button></div>
@@ -777,7 +778,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       ${area("c-notas", "Notas", d.notas)}
       <div class="actions">${isNew ? "" : `<button type="button" class="danger" id="del">Borrar</button>`}<button type="button" data-close>Cancelar</button><button class="primary" type="submit">Guardar</button></div>
       ${isNew ? "" : `<div class="actions"><button type="button" id="mark-op">${d.operado ? "Volver a pendientes" : "Marcar como operado"}</button>${p && isInternado(p) ? `<button type="button" id="go-pt">Ver internación</button>` : `<button type="button" id="internar">Internar hoy</button>`}</div>
-      <div class="actions"><button type="button" id="cx-cal">Recordatorios en el calendario</button><button type="button" id="cancel-cx">${d.cancelada ? "Reactivar" : "Cancelar cirugía"}</button></div>`}
+      <div class="actions"><button type="button" id="cx-cal">Actualizar recordatorio</button><button type="button" id="cancel-cx">${d.cancelada ? "Reactivar" : "Cancelar cirugía"}</button></div>`}
     `, (el) => {
       const drawSteps = () => {
         $("#steps").innerHTML = STEP_GROUPS.map(([g, list]) => `<div class="step-group"><div class="lbl">${g}</div>${list.map(([k, l]) => {
@@ -793,10 +794,12 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       $("#c-extra").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addExtra(); } });
       $("#c-sinmat").onchange = () => { sinMat = $("#c-sinmat").checked; drawSteps(); };
       const person = () => ({ nombre: val("c-nombre"), dni: val("c-dni"), edad: val("c-edad"), os: val("c-os"), afiliado: val("c-afiliado"), contacto: val("c-contacto"), alergias: val("c-alergias") });
-      const cxData = () => ({ medico: val("c-medico"), patologia: val("c-patologia"), cx: val("c-cx"), consulta: val("c-consulta"), fechaCx: val("c-fecha"), notas: val("c-notas"), steps: Object.assign({}, steps), extra: extra.map((x) => Object.assign({}, x)), sinMateriales: sinMat });
+      const cxData = () => ({ medico: val("c-medico"), patologia: val("c-patologia"), cx: val("c-cx"), consulta: val("c-consulta"), fechaCx: val("c-fecha"), horaCx: val("c-hora"), notas: val("c-notas"), steps: Object.assign({}, steps), extra: extra.map((x) => Object.assign({}, x)), sinMateriales: sinMat });
       // Guarda paciente y cirugía; devuelve [paciente, cirugía] o null si falta el nombre.
       const commit = () => {
         const pdata = person(); if (!pdata.nombre) { $("#c-nombre").focus(); toast("Falta el nombre"); return null; }
+        if (!val("c-fecha")) { $("#c-fecha").focus(); toast("Falta la fecha de la cirugía"); return null; }
+        if (!val("c-hora")) { $("#c-hora").focus(); toast("Falta la hora de la cirugía"); return null; }
         let pt = p;
         if (!pt) { realData(); pt = Object.assign({ id: uid(), cama: "", medico: val("c-medico"), app: "", dx: "", ingreso: null, alta: null }, pdata); S.patients.push(pt); }
         else Object.assign(pt, pdata);
@@ -805,7 +808,13 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
         else Object.assign(c, cxData(), { pid: pt.id });
         return [pt, c];
       };
-      el.addEventListener("submit", (e) => { e.preventDefault(); if (!commit()) return; save(); closeSheet(); render(); toast(isNew ? "Cirugía agregada" : "Guardado"); });
+      const before = s ? s.fechaCx + " " + (s.horaCx || "") : "";
+      el.addEventListener("submit", (e) => {
+        e.preventDefault(); const r = commit(); if (!r) return; save(); closeSheet(); render();
+        // Al crearla o al cambiar fecha u hora, arma el recordatorio del Calendario con las dos alarmas.
+        if (isNew || before !== r[1].fechaCx + " " + r[1].horaCx) { cxCalendar(r[1], r[0]); toast(isNew ? "Cirugía agregada. Toca Agregar en el calendario" : "Fecha cambiada. Actualiza el evento en el calendario"); }
+        else toast("Guardado");
+      });
       const mo = $("#mark-op");
       if (mo) mo.onclick = () => {
         if (!commit()) return;
@@ -998,21 +1007,34 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
         notify((p && p.cama ? "Cama " + p.cama + ": " : "") + cur.text, "Pendiente " + cur.time);
       }, ms));
     });
+    S.surg.filter((c) => !c.operado && !c.cancelada && c.fechaCx === t && c.horaCx).forEach((c) => {
+      const [h, m] = c.horaCx.split(":").map(Number); const at = parseYmd(t); at.setHours(h, m, 0, 0);
+      const seven = parseYmd(t); seven.setHours(7, 0, 0, 0);
+      [seven, new Date(at - 36e5)].forEach((when) => {
+        const ms = when - now; if (ms < 0) return;
+        alertTimers.push(setTimeout(() => {
+          const p = patientOf(c.pid) || { nombre: "" };
+          const miss = missingOf(c).map((k) => (STEPS.some((x) => x[0] === k) ? stepLabel(k) : k).toLowerCase());
+          notify((miss.length ? "Falta: " + miss.join(", ") : "Tiene todo listo"), "Cirugía " + c.horaCx + " · " + p.nombre.split(",")[0] + " · " + (c.cx || ""));
+        }, ms));
+      });
+    });
   }
   // Crea un evento con alarma para la app Calendario. Solo lleva la cama, no el nombre del paciente.
-  // Recordatorios de una cirugía: controlar a los 7 días de dar los prequirúrgicos, y el día anterior a la fecha de cirugía.
+  // Evento de la cirugía en el Calendario con alarmas a las 7:00 de ese día y una hora antes, diciendo qué le falta.
+  // Usa siempre el mismo identificador para que, al actualizarlo, el iPhone pueda reemplazar el evento anterior.
   function cxCalendar(c, p) {
+    if (!c.fechaCx || !c.horaCx) { toast("Pon fecha y hora de la cirugía"); return; }
     const ini = (p.nombre || "").split(/[ ,]+/).filter((w) => /^[a-záéíóúñü]/i.test(w)).map((w) => w[0].toUpperCase()).join("");
-    const what = (c.cx || c.patologia || "cirugía") + (ini ? " (" + ini + ")" : "");
-    const evs = [];
-    if (c.fechaCx) {
-      const prev = addDays(c.fechaCx, -1);
-      if (prev >= today()) evs.push({ date: prev, time: "08:00", text: "Mañana se opera " + what + ": revisar autorización y materiales" });
-      if (c.fechaCx >= today()) evs.push({ date: c.fechaCx, time: "07:00", text: "Hoy se opera " + what });
-    }
-    if (!PRE.every((k) => isDone(c, k))) evs.push({ date: addDays(today(), 7), time: "09:00", text: "Controlar prequirúrgicos de " + what });
-    if (!evs.length) { toast("Pon una fecha de cirugía para crear los recordatorios"); return; }
-    icsDownload(evs);
+    const what = "Cx " + (c.cx || c.patologia || "") + (ini ? " (" + ini + ")" : "");
+    const miss = missingOf(c).map((k) => (STEPS.some((x) => x[0] === k) ? stepLabel(k) : k).toLowerCase());
+    const status = miss.length ? "Falta: " + miss.join(", ") : "Tiene todo listo";
+    const seven = parseYmd(c.fechaCx); seven.setHours(7, 0, 0, 0);
+    const [h, m] = c.horaCx.split(":").map(Number); const at = parseYmd(c.fechaCx); at.setHours(h, m, 0, 0);
+    const alarms = ["-PT1H"];
+    if (seven < at - 36e5) alarms.unshift(seven.toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z");
+    c.calSeq = (c.calSeq || 0) + 1; save();
+    icsDownload([{ date: c.fechaCx, time: c.horaCx, minutes: 120, text: what + " · " + status, desc: status, uid: "cx-" + c.id, seq: c.calSeq, alarms }]);
   }
   function addToCalendar(d) {
     const p = d.pid && patientOf(d.pid);
@@ -1024,12 +1046,17 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     evs.forEach((d) => {
       const title = d.text.replace(/[\\,;]/g, (c) => "\\" + c).replace(/\n/g, " ");
       const dt = d.date.replace(/-/g, "") + "T" + d.time.replace(":", "") + "00";
-      const [h, m] = d.time.split(":").map(Number); const end = new Date(parseYmd(d.date)); end.setHours(h, m + 15);
+      const [h, m] = d.time.split(":").map(Number); const end = new Date(parseYmd(d.date)); end.setHours(h, m + (d.minutes || 15));
       const dtEnd = ymd(end).replace(/-/g, "") + "T" + pad(end.getHours()) + pad(end.getMinutes()) + "00";
-      lines.push("BEGIN:VEVENT", "UID:" + uid() + "@bitacora", "DTSTAMP:" + stamp, "DTSTART:" + dt, "DTEND:" + dtEnd, "SUMMARY:" + title, "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + title, "TRIGGER:PT0M", "END:VALARM", "END:VEVENT");
+      lines.push("BEGIN:VEVENT", "UID:" + (d.uid || uid()) + "@bitacora", "SEQUENCE:" + (d.seq || 0), "DTSTAMP:" + stamp, "DTSTART:" + dt, "DTEND:" + dtEnd, "SUMMARY:" + title);
+      if (d.desc) lines.push("DESCRIPTION:" + d.desc.replace(/[\\,;]/g, (c) => "\\" + c));
+      (d.alarms || ["PT0M"]).forEach((t) => lines.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + title, /Z$/.test(t) ? "TRIGGER;VALUE=DATE-TIME:" + t : "TRIGGER:" + t, "END:VALARM"));
+      lines.push("END:VEVENT");
     });
     lines.push("END:VCALENDAR");
-    const ics = lines.join("\r\n");
+    // Las líneas largas se cortan en pedazos, como pide el formato del calendario.
+    const fold = (l) => { const parts = []; for (let i = 0; i < l.length; i += 60) parts.push(l.slice(i, i + 60)); return parts.join("\r\n "); };
+    const ics = lines.map(fold).join("\r\n");
     try {
       const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
       const a = document.createElement("a"); a.href = url; a.download = "aviso.ics";
