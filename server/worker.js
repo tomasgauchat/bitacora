@@ -2,12 +2,16 @@
 // Guarda, por cada teléfono, los avisos programados y manda la notificación a la hora justa.
 // También publica un calendario (.ics) al que el iPhone se suscribe una vez.
 // Solo recibe textos cortos con iniciales, nunca nombres completos de pacientes.
+// Guarda además la copia diaria de la app, cifrada en el teléfono: el servidor no puede leerla.
 
 import { DurableObject } from "cloudflare:workers";
 
 const APP_ORIGIN = "https://tomasgauchat.github.io";
 const SUBJECT = "https://tomasgauchat.github.io/bitacora/";
 const DEVICE_RE = /^[A-Za-z0-9_-]{20,64}$/;
+const BACKUP_RE = /^[0-9a-f]{32}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const BACKUP_DAYS = 30;
 
 const cors = {
   "Access-Control-Allow-Origin": APP_ORIGIN,
@@ -35,6 +39,21 @@ export default {
       const stub = env.DEVICE.get(env.DEVICE.idFromName(device));
       if (parts[1] === "sync") return json(await stub.sync(body));
       return json(await stub.test(body));
+    }
+    // Copia cifrada: /api/backup/:id (POST guarda la del día, GET lista las fechas), /api/backup/:id/:fecha (GET la devuelve).
+    if (parts[0] === "api" && parts[1] === "backup" && BACKUP_RE.test(parts[2] || "")) {
+      const stub = env.DEVICE.get(env.DEVICE.idFromName("copia:" + parts[2]));
+      if (req.method === "POST" && parts.length === 3) {
+        let body = {};
+        try { body = await req.json(); } catch (e) { return json({ error: "datos inválidos" }, 400); }
+        if (!DATE_RE.test(body.date || "") || typeof body.data !== "string" || !body.data.length || body.data.length > 1900000) return json({ error: "copia inválida" }, 400);
+        return json(await stub.backupPut(body.date, body.data));
+      }
+      if (req.method === "GET" && parts.length === 3) return json(await stub.backupList());
+      if (req.method === "GET" && parts.length === 4 && DATE_RE.test(parts[3])) {
+        const data = await stub.backupGet(parts[3]);
+        return data ? json({ date: parts[3], data }) : json({ error: "no hay copia de ese día" }, 404);
+      }
     }
     if (parts[0] === "cal" && parts.length === 2 && req.method === "GET") {
       const device = parts[1].replace(/\.ics$/, "");
@@ -126,6 +145,24 @@ export class Device extends DurableObject {
     } catch (e) {
       return { ok: false, status: 0 };
     }
+  }
+
+  // Copias: una por día (la última de ese día reemplaza a la anterior); se guardan los últimos 30 días.
+  async backupPut(date, data) {
+    await this.ctx.storage.put("copia:" + date, data);
+    const dates = await this.backupDates();
+    for (const d of dates.slice(BACKUP_DAYS)) await this.ctx.storage.delete("copia:" + d);
+    return { ok: true, date };
+  }
+  async backupDates() {
+    const keys = await this.ctx.storage.list({ prefix: "copia:" });
+    return [...keys.keys()].map((k) => k.slice(6)).sort().reverse();
+  }
+  async backupList() {
+    return { dates: await this.backupDates() };
+  }
+  async backupGet(date) {
+    return (await this.ctx.storage.get("copia:" + date)) || null;
   }
 
   // Calendario para suscribirse desde el iPhone; se actualiza solo cuando la app sincroniza.

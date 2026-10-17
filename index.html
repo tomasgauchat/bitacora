@@ -321,7 +321,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     } catch (e) {}
     S = sampleData();
   }
-  function save() { setTimeout(() => { scheduleAlerts(); queueSync(); }, 0); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast("No se pudo guardar en este teléfono"); } }
+  function save() { setTimeout(() => { scheduleAlerts(); queueSync(); queueBackup(); }, 0); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast("No se pudo guardar en este teléfono"); } }
   function realData() { if (S.sample) S = blank(); }
   const PERSON = ["nombre", "dni", "edad", "os", "afiliado", "contacto", "app", "alergias"];
   // Las cirugías cargadas antes guardaban los datos del paciente adentro: los paso a un paciente vinculado.
@@ -448,6 +448,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
   const INSTALLED = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
   function setupNote() {
     if (IOS && !INSTALLED) return `<p class="sample-note">Para que te lleguen los avisos, instala la app: toca Compartir y después <b>Agregar a pantalla de inicio</b>. Luego ábrela desde el ícono.</p>`;
+    if (!S.sample && AVISOS && !backupSeen()) return `<p class="sample-note">Tu copia automática ya está activa. Guarda tu código para poder recuperarla. <button data-act="go-copia">Ver código</button></p>`;
     if (!S.sample && AVISOS && canPush() && !pushOn && Notification.permission !== "denied") return `<p class="sample-note">Las notificaciones están apagadas. <button data-act="notif">Activarlas</button></p>`;
     return "";
   }
@@ -582,12 +583,13 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     const n = S.sample ? 0 : S.patients.length + S.surg.length;
     return `<header class="top"><div><div class="eyebrow">${n} pacientes guardados</div><h1>Copia de seguridad</h1></div></header>
       <div style="display:grid;gap:14px">
-        <div class="card"><h2>Guardar una copia</h2>
-          <p>Todo se guarda solo en este teléfono, no se sube a ningún lado. Guarda una copia una vez por semana (en Archivos, iCloud Drive o Google Drive) para no perder nada si cambias o pierdes el teléfono.</p>
+        ${AVISOS ? autoBackupCard() : ""}
+        <div class="card"><h2>Guardar una copia en un archivo</h2>
+          <p>Si además quieres una copia en tus archivos (Archivos, iCloud Drive o Google Drive), guárdala desde acá cuando quieras.</p>
           <div class="btns"><button class="primary" data-act="export">Guardar copia</button></div></div>
         <div class="card"><h2>Recuperar una copia</h2>
-          <p>Elige un archivo de copia guardado antes. Reemplaza lo que hay ahora en la app.</p>
-          <div class="btns"><label for="import-file">Elegir archivo…</label><input id="import-file" type="file" accept=".json,application/json" hidden></div></div>
+          <p>Reemplaza lo que hay ahora en la app. Puedes traer la copia automática con tu código o elegir un archivo guardado antes.</p>
+          <div class="btns">${AVISOS ? `<button class="primary" data-act="cloud-restore">Con mi código</button>` : ""}<label for="import-file">Elegir archivo…</label><input id="import-file" type="file" accept=".json,application/json" hidden></div></div>
         <div class="card"><h2>Notificaciones</h2>
           <p>Te avisan aunque la app esté cerrada: el día de cada cirugía a las 7:00 y una hora antes, diciendo lo que le falta al paciente en ese momento, y a la hora de cada pendiente. ${ANDROID ? "Chrome tiene que tener permiso para notificar." : "En el iPhone primero hay que instalar la app (ver abajo) y activarlas desde el ícono."}</p>
           <div class="btns"><button class="primary" data-act="notif" id="notif-btn">${notifLabel()}</button><button data-act="notif-test">Probar</button></div></div>
@@ -596,6 +598,17 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       </div>`;
   }
 
+  function autoBackupCard() {
+    const code = backupCode(), last = backupLast();
+    if (S.sample) return `<div class="card"><h2>Copia automática</h2><p>Cuando cargues tus propios pacientes, la app guarda sola una copia cifrada todos los días.</p></div>`;
+    return `<div class="card"><h2>Copia automática</h2>
+          <p>La app guarda sola una copia de todo, cifrada, cada día que la usas. Se guardan los últimos 30 días. Solo se puede abrir con tu código, ni siquiera el servidor puede leerla.</p>
+          <p><b>${last ? "Última copia: " + esc(fmtLong(last.slice(0, 10))) + " a las " + esc(last.slice(11, 16)) : "Todavía no se hizo la primera copia (hace falta internet)"}</b></p>
+          <p>Tu código para recuperarla en otro teléfono:</p>
+          <p style="font:600 17px ui-monospace,Menlo,monospace;letter-spacing:.5px;user-select:all">${esc(code)}</p>
+          <p>Guárdalo fuera del teléfono (por ejemplo, mándatelo por mail). Sin este código no se puede recuperar la copia.</p>
+          <div class="btns"><button class="primary" data-act="copy-code">Copiar código</button>${backupSeen() ? "" : `<button data-act="code-saved">Ya lo guardé</button>`}</div></div>`;
+  }
   const BTN_LINK = "height:44px;border-radius:12px;padding:0 14px;font-weight:600;display:inline-flex;align-items:center;text-decoration:none;background:var(--accent);color:var(--accent-ink)";
   function calCard() {
     if (ANDROID) return `<div class="card"><h2>Google Calendar</h2>
@@ -918,7 +931,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
   // ---------- copia de seguridad ----------
   async function exportData() {
     if (S.sample) { toast("Todavía no hay datos propios para guardar"); return; }
-    const data = JSON.stringify({ app: "bitacora-camila", version: 3, exportedAt: new Date().toISOString(), patients: S.patients, notes: S.notes, todos: S.todos, surg: S.surg });
+    const data = backupJson();
     const name = "bitacora-" + today() + ".json";
     const file = new File([data], name, { type: "application/json" });
     try {
@@ -930,17 +943,91 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       toast("Copia guardada");
     } catch (e) { toast("No se pudo guardar la copia en este navegador"); }
   }
+  const backupJson = () => JSON.stringify({ app: "bitacora-camila", version: 3, exportedAt: new Date().toISOString(), patients: S.patients, notes: S.notes, todos: S.todos, surg: S.surg });
+  function applyBackup(o) {
+    if (!o || o.app !== "bitacora-camila" || !Array.isArray(o.patients) || !Array.isArray(o.surg)) throw new Error("formato");
+    const prev = S;
+    S = migrate({ patients: o.patients, notes: o.notes || [], todos: o.todos || [], surg: o.surg, sample: false });
+    save(); tab = "pase"; day = today(); render();
+    toast("Copia recuperada", "Deshacer", () => { S = prev; save(); render(); });
+  }
+
+  // Copia automática: se cifra en el teléfono con el código (AES-GCM) y se sube al servidor, una por día.
+  const CODE_KEY = KEY + "-copia-codigo", LAST_KEY = KEY + "-copia-ultima", SEEN_KEY = KEY + "-copia-vista";
+  const lsGet = (k) => { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  const CODE_ABC = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  function backupCode() {
+    let c = lsGet(CODE_KEY);
+    if (!c) {
+      const r = crypto.getRandomValues(new Uint8Array(20));
+      c = [...r].map((b) => CODE_ABC[b % CODE_ABC.length]).join("").replace(/(.{5})(?!$)/g, "$1-");
+      lsSet(CODE_KEY, c);
+    }
+    return c;
+  }
+  const backupLast = () => lsGet(LAST_KEY);
+  const backupSeen = () => lsGet(SEEN_KEY) === "1";
+  const normCode = (c) => String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  async function codeKeys(code) {
+    const n = new TextEncoder().encode(normCode(code));
+    const id = hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("bitacora-copia-id:" + normCode(code)))).slice(0, 32);
+    const base = await crypto.subtle.importKey("raw", n, "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: new TextEncoder().encode("bitacora-copia"), iterations: 150000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+    return { id, key };
+  }
+  const toB64 = (u8) => { let s = ""; for (let i = 0; i < u8.length; i += 32768) s += String.fromCharCode(...u8.subarray(i, i + 32768)); return btoa(s); };
+  const fromB64 = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
+  let backupTimer, backupKeys;
+  function queueBackup() {
+    if (!AVISOS || S.sample) return;
+    clearTimeout(backupTimer);
+    backupTimer = setTimeout(() => uploadBackup().catch(() => {}), 4000);
+  }
+  async function uploadBackup() {
+    if (!AVISOS || S.sample || !navigator.onLine) return;
+    backupKeys = backupKeys || (await codeKeys(backupCode()));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, backupKeys.key, new TextEncoder().encode(backupJson())));
+    const data = new Uint8Array(12 + cipher.length); data.set(iv); data.set(cipher, 12);
+    const r = await fetch(AVISOS + "/api/backup/" + backupKeys.id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date: today(), data: toB64(data) }) });
+    if (!r.ok) throw new Error("copia " + r.status);
+    lsSet(LAST_KEY, today() + "T" + new Date().toTimeString().slice(0, 5));
+    if (tab === "copia") render();
+  }
+  // Si hoy todavía no se subió la copia (por ejemplo, sin internet), la sube al abrir o volver a la app.
+  function backupIfDue() { if (AVISOS && !S.sample && backupLast().slice(0, 10) !== today()) queueBackup(); }
+  function cloudRestore() {
+    sheet(`<h3>Recuperar con mi código</h3>
+      <label class="f">Código de la copia<input id="restore-code" autocomplete="off" autocapitalize="characters" placeholder="XXXXX-XXXXX-XXXXX-XXXXX"></label>
+      <p>Trae la copia más reciente guardada con ese código y reemplaza lo que hay ahora en la app.</p>
+      <div class="actions"><button type="button" data-close>Cancelar</button><button class="primary" type="submit">Recuperar</button></div>`, (f) => f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const code = $("#restore-code").value;
+      if (normCode(code).length !== 20) { toast("El código tiene 20 letras y números"); return; }
+      try {
+        const k = await codeKeys(code);
+        const list = await (await fetch(AVISOS + "/api/backup/" + k.id)).json();
+        if (!list.dates || !list.dates.length) { toast("No hay copias guardadas con ese código"); return; }
+        const got = await (await fetch(AVISOS + "/api/backup/" + k.id + "/" + list.dates[0])).json();
+        const raw = fromB64(got.data);
+        const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.subarray(0, 12) }, k.key, raw.subarray(12));
+        closeSheet();
+        applyBackup(JSON.parse(new TextDecoder().decode(plain)));
+        // Desde ahora este teléfono sigue guardando con el mismo código.
+        lsSet(CODE_KEY, normCode(code).replace(/(.{5})(?!$)/g, "$1-")); lsSet(SEEN_KEY, "1"); backupKeys = null;
+        toast("Copia del " + fmtLong(list.dates[0]) + " recuperada");
+      } catch (err) { toast("No se pudo recuperar. Revisa el código y tener internet"); }
+    }));
+  }
+
   function importFile(f) {
     if (!f) return;
     const r = new FileReader();
     r.onload = () => {
       try {
-        const o = JSON.parse(r.result);
-        if (!o || o.app !== "bitacora-camila" || !Array.isArray(o.patients) || !Array.isArray(o.surg)) throw new Error("formato");
-        const prev = S;
-        S = migrate({ patients: o.patients, notes: o.notes || [], todos: o.todos || [], surg: o.surg, sample: false });
-        save(); tab = "pase"; day = today(); render();
-        toast("Copia recuperada", "Deshacer", () => { S = prev; save(); render(); });
+        applyBackup(JSON.parse(r.result));
       } catch (e) { toast("Ese archivo no es una copia de la bitácora"); }
     };
     r.readAsText(f);
@@ -972,6 +1059,10 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       case "share-pase": sharePase(); break;
       case "clear-sample": S = blank(); save(); render(); break;
       case "export": exportData(); break;
+      case "cloud-restore": cloudRestore(); break;
+      case "copy-code": navigator.clipboard.writeText(backupCode()).then(() => { lsSet(SEEN_KEY, "1"); render(); toast("Código copiado. Guárdalo fuera del teléfono"); }, () => toast(backupCode())); break;
+      case "code-saved": lsSet(SEEN_KEY, "1"); render(); break;
+      case "go-copia": tab = "copia"; render(); window.scrollTo(0, 0); break;
       case "notif": askNotif(); break;
       case "install": if (installEvt) { installEvt.prompt(); installEvt.userChoice.finally(() => { installEvt = null; render(); }); } break;
       case "notif-test": testPush(); break;
@@ -1126,9 +1217,11 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     try { localStorage.setItem(KEY + "-aviso-cx", today()); } catch (e) {}
     notify(urgent.map((a) => a.p.nombre.split(",")[0] + ": " + a.text).join("\n"), urgent.length === 1 ? "Una cirugía necesita algo" : urgent.length + " cirugías necesitan algo");
   }
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) { scheduleAlerts(); cxDailyNotice(); queueSync(); } });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { scheduleAlerts(); cxDailyNotice(); queueSync(); backupIfDue(); }
+    // Al salir de la app, sube enseguida la copia pendiente.
+    else if (backupTimer) { clearTimeout(backupTimer); backupTimer = null; uploadBackup().catch(() => {}); } });
 
-  load(); render(); scheduleAlerts(); setTimeout(cxDailyNotice, 1500); checkPush();
+  load(); render(); scheduleAlerts(); setTimeout(cxDailyNotice, 1500); checkPush(); backupIfDue();
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
   //SW-START
   if ("serviceWorker" in navigator && window.isSecureContext) {
