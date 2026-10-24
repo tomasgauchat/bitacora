@@ -116,6 +116,8 @@ section.block { display: grid; gap: 8px; margin-bottom: 22px; }
 .pchip .bx { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--muted); flex: none; }
 .pchip.done { background: var(--ok-soft); color: var(--muted); text-decoration: line-through; }
 .pchip.done .bx { background: var(--ok); border-color: var(--ok); }
+.pchip.on { background: var(--ok-soft); }
+.pchip.on .bx { background: var(--ok); border-color: var(--ok); }
 
 /* Listas de pendientes */
 .list { display: grid; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
@@ -235,6 +237,12 @@ nav.tabs button[aria-current="page"] { color: var(--accent); }
 .hist-day { border-left: 3px solid var(--line); padding-left: 10px; display: grid; gap: 3px; }
 .hist-day b { font-size: 13px; color: var(--muted); }
 .hist-day div { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ctab-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+.ctab { border-collapse: collapse; font-size: 14px; min-width: 100%; }
+.ctab th, .ctab td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; white-space: pre-wrap; min-width: 72px; }
+.ctab thead th { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.ctab tbody th { position: sticky; left: 0; background: var(--surface); font-weight: 600; white-space: nowrap; }
+.ctab tr:last-child > * { border-bottom: 0; }
 .confirm { background: var(--warm-soft); border-radius: 12px; padding: 12px; display: grid; gap: 10px; font-size: 15px; }
 .tel { justify-self: start; display: inline-flex; align-items: center; text-decoration: none; }
 
@@ -311,8 +319,9 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
   // todos:    { id, pid|null, text, date, time, done, doneAt }
   // surg:     { id, pid, medico, patologia, cx, consulta, fechaCx, operado, cancelada, sinMateriales, notas,
   //             steps: { clave: fecha en que se hizo }, extra: [{ text, done }] }  (los datos personales viven en patients)
+  // ctrl:     { id, text }   (lista de controles frecuentes para sumar rápido a "Controles")
   // Un paciente sin ingreso no está internado: solo aparece en Cirugías y en la búsqueda.
-  const blank = () => ({ patients: [], notes: [], todos: [], surg: [], sample: false });
+  const blank = () => ({ patients: [], notes: [], todos: [], surg: [], ctrl: [], sample: false });
   let S = blank();
   function load() {
     try {
@@ -355,6 +364,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     return {
       sample: true,
       patients: [p1, p2, p3, p4, p5],
+      ctrl: ["TA", "FC", "Afebril", "Sat", "Diuresis", "Dolor controlado"].map((text) => ({ id: uid(), text })),
       notes: [
         { id: uid(), pid: p1.id, date: y, controles: "TA 130/80", novedades: "Lab: Hto 33, GB 7400. Se solicita valoración por cardiología." },
         { id: uid(), pid: p1.id, date: t, controles: "TA 120/70, afebril", novedades: "Buena evolución. Cardiología autoriza cirugía. Se aguarda autorización de materiales." },
@@ -690,7 +700,13 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
         <dt>Ingreso</dt><dd>${esc(fmtShort(p.ingreso))} (día ${diffDays(day, p.ingreso) + 1})${p.alta ? " · alta " + esc(fmtShort(p.alta)) : ""}</dd>
       </dl>
       <h4>${esc(fmtLong(day))}</h4>
-      ${area("n-controles", "Controles", n.controles)}
+      <div class="f">Controles
+        <textarea id="n-controles" aria-label="Controles">${esc(n.controles)}</textarea>
+        <div class="quick"><input id="ctrl-q" placeholder="Buscar o escribir un control" aria-label="Buscar o escribir un control"><button type="button" id="ctrl-add">Agregar</button></div>
+        <label class="switch" style="display:none"><input type="checkbox" id="ctrl-save" style="width:22px;height:22px;min-height:0;padding:0">Guardar en la lista</label>
+        <div class="pend-row" id="ctrl-chips"></div>
+        <div class="btns"><button type="button" class="ghost-btn" id="ctrl-hist">Ver evolución</button><button type="button" class="ghost-btn" id="ctrl-edit">Editar lista</button></div>
+      </div>
       ${area("n-novedades", "Novedades (labo, imágenes, evolución)", n.novedades, "big")}
       ${prev && !n.novedades ? `<button type="button" class="ghost-btn" id="copy-prev" style="justify-self:start">Copiar novedades de ${esc(dayLabel(prev.date).toLowerCase())}</button>` : ""}
       <div class="f">Pendientes
@@ -708,10 +724,43 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       </div>
       ${hist.length ? `<h4>Otros días</h4><div class="hist">${hist.map((h) => `<div class="hist-day"><b>${esc(dayLabel(h.date))} · ${esc(fmtShort(h.date))}</b>${h.controles ? `<div>Controles: ${esc(h.controles)}</div>` : ""}${h.novedades ? `<div>${esc(h.novedades)}</div>` : ""}</div>`).join("")}</div>` : ""}
     `, (el) => {
-      const keep = () => setNote(p.id, day, { controles: val("n-controles"), novedades: $("#n-novedades").value.trim() });
+      const keep = () => setNote(p.id, day, { controles: ctrlText(val("n-controles")), novedades: $("#n-novedades").value.trim() });
+      // Controles como lista: cada Enter arranca un ítem con viñeta; los guardados se suman tocándolos.
+      const ta = $("#n-controles"), q = $("#ctrl-q");
+      const addLine = (t) => { const v = ctrlText(ta.value); ta.value = (v ? v + "\n" : "") + "• " + t; };
+      const chips = () => {
+        const s = norm(q.value.trim());
+        const names = S.ctrl.map((c) => c.text), on = new Set(ta.value.split("\n").map((l) => ctrlOwner(l, names)));
+        $("#ctrl-chips").innerHTML = S.ctrl.filter((c) => norm(c.text).includes(s)).sort((a, b) => a.text.localeCompare(b.text, "es"))
+          .map((c) => `<button type="button" class="pchip ${on.has(c.text) ? "on" : ""}" data-ci="${c.id}" aria-pressed="${on.has(c.text)}"><span class="bx"></span>${esc(c.text)}</button>`).join("");
+        $("#ctrl-save").closest("label").style.display = !s || S.ctrl.some((c) => norm(c.text) === s) ? "none" : "";
+      };
+      const addCtrl = () => {
+        const v = val("ctrl-q"); if (!v) return;
+        if (!ta.value.split("\n").some((l) => norm(l.replace(/^\s*•\s*/, "").trim()) === norm(v))) addLine(v);
+        if ($("#ctrl-save").checked && !S.ctrl.some((c) => norm(c.text) === norm(v))) { S.ctrl.push({ id: uid(), text: v }); save(); }
+        q.value = ""; $("#ctrl-save").checked = false; chips();
+      };
+      chips();
+      q.addEventListener("input", chips);
+      q.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCtrl(); } });
+      $("#ctrl-add").onclick = addCtrl;
+      // Tocar un control lo suma; si ya está (aunque tenga valor, "TA 120/70"), lo saca.
+      $("#ctrl-chips").onclick = (e) => {
+        const b = e.target.closest("[data-ci]"); const c = b && S.ctrl.find((x) => x.id === b.dataset.ci); if (!c) return;
+        const names = S.ctrl.map((x) => x.text), lines = ta.value.split("\n");
+        if (lines.some((l) => ctrlOwner(l, names) === c.text)) ta.value = ctrlText(lines.filter((l) => ctrlOwner(l, names) !== c.text).join("\n"));
+        else addLine(c.text);
+        q.value = ""; chips();
+      };
+      ta.addEventListener("input", chips);
+      ta.addEventListener("focus", () => { if (!ta.value.trim()) ta.value = "• "; });
+      ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ta.setRangeText("\n• ", ta.selectionStart, ta.selectionEnd, "end"); } });
+      $("#ctrl-edit").onclick = () => { keep(); save(); render(); editCtrlList(() => openPatient(p)); };
+      $("#ctrl-hist").onclick = () => { keep(); save(); render(); ctrlHistory(p, () => openPatient(p)); };
       const reopen = () => { save(); render(); const top = $("#sheet").scrollTop; openPatient(p); $("#sheet").scrollTop = top; };
       el.addEventListener("submit", (e) => { e.preventDefault(); keep(); save(); closeSheet(); render(); toast("Guardado"); });
-      const cp = $("#copy-prev"); if (cp) cp.onclick = () => { $("#n-novedades").value = prev.novedades; if (!val("n-controles")) $("#n-controles").value = prev.controles || ""; cp.remove(); };
+      const cp = $("#copy-prev"); if (cp) cp.onclick = () => { $("#n-novedades").value = prev.novedades; if (!ctrlText(val("n-controles"))) $("#n-controles").value = prev.controles || ""; cp.remove(); };
       const addP = () => { const v = val("new-pend"); if (!v) return; keep(); S.todos.push({ id: uid(), pid: p.id, text: v, date: day, time: "", done: false, doneAt: null }); reopen(); $("#new-pend").focus(); };
       $("#add-pend").onclick = addP;
       $("#new-pend").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addP(); } });
@@ -724,6 +773,63 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
         keep(); p.alta = day; save(); closeSheet(); render(); toast("Alta registrada", "Deshacer", () => { p.alta = null; save(); render(); });
       });
       const ua = $("#undo-alta"); if (ua) ua.onclick = () => { keep(); p.alta = null; save(); closeSheet(); render(); toast("Alta quitada"); };
+    });
+  }
+
+  // Saca las viñetas vacías que quedan al apretar Enter de más.
+  const ctrlText = (s) => s.split("\n").filter((l) => l.replace(/^\s*•/, "").trim()).join("\n");
+
+  // Separa los controles de un día por control guardado: "• TA 120/70, afebril" -> { TA: "120/70", Afebril: "✓" }.
+  // Corta por renglón y por coma seguida de espacio (la coma decimal "33,5" queda entera); lo que no coincide va a "Otros".
+  // A qué control guardado corresponde un renglón: el nombre más largo con el que empieza ("TA 120/70" -> "TA", no "Taquicardia").
+  function ctrlOwner(line, names) {
+    const l = norm(line.replace(/^\s*•\s*/, "").trim());
+    return names.slice().sort((a, b) => b.length - a.length).find((x) => l.startsWith(norm(x)) && !/[a-z0-9]/i.test(l.charAt(x.length)));
+  }
+  function parseCtrl(text, names) {
+    const out = {};
+    text.split(/\n|,\s+/).map((l) => l.replace(/^\s*•\s*/, "").trim()).filter(Boolean).forEach((l) => {
+      const n = ctrlOwner(l, names);
+      const k = n || "Otros", v = n ? l.slice(n.length).replace(/^[\s:=-]+/, "") || "✓" : l;
+      out[k] = out[k] ? out[k] + "\n" + v : v;
+    });
+    return out;
+  }
+
+  // Evolución de los controles de un paciente: un control por fila, un día por columna (el más nuevo a la derecha).
+  function ctrlHistory(p, back) {
+    const notes = S.notes.filter((n) => n.pid === p.id && n.controles).sort((a, b) => (a.date < b.date ? -1 : 1));
+    const names = S.ctrl.map((c) => c.text), days = notes.map((n) => parseCtrl(n.controles, names));
+    const rows = [...names.slice().sort((a, b) => a.localeCompare(b, "es")), "Otros"].filter((k) => days.some((d) => d[k]));
+    sheet(`
+      <h3>Controles · ${esc(p.nombre)}</h3>
+      ${notes.length ? `<div class="ctab-wrap" id="ctab"><table class="ctab">
+        <thead><tr><th></th>${notes.map((n) => `<th>${esc(fmtShort(n.date).slice(0, 5))}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map((k) => `<tr><th>${esc(k)}</th>${days.map((d) => `<td>${esc(d[k] || "–")}</td>`).join("")}</tr>`).join("")}</tbody>
+      </table></div>` : "<p>Todavía no hay controles cargados.</p>"}
+      <div class="actions"><button class="primary" type="submit">Volver</button></div>
+    `, (el) => {
+      const t = $("#ctab"); if (t) t.scrollLeft = t.scrollWidth;
+      el.addEventListener("submit", (e) => { e.preventDefault(); back(); });
+    });
+  }
+
+  // Lista de controles guardados: agregar, editar (se guarda al salir del campo) y borrar.
+  function editCtrlList(back) {
+    const items = S.ctrl.slice().sort((a, b) => a.text.localeCompare(b.text, "es"));
+    sheet(`
+      <h3>Lista de controles</h3>
+      <div class="quick"><input id="cl-new" placeholder="Nuevo control" aria-label="Nuevo control"><button type="button" id="cl-add">Agregar</button></div>
+      <div style="display:grid;gap:8px">${items.map((c) => `<div class="quick"><input data-cl="${c.id}" value="${esc(c.text)}" aria-label="Control"><button type="button" data-cl-del="${c.id}">Borrar</button></div>`).join("") || "<p>Todavía no hay controles guardados.</p>"}</div>
+      <div class="actions"><button class="primary" type="submit">Listo</button></div>
+    `, (el) => {
+      const reopen = () => { save(); editCtrlList(back); };
+      el.querySelectorAll("[data-cl]").forEach((i) => i.addEventListener("change", () => { const c = S.ctrl.find((x) => x.id === i.dataset.cl), v = i.value.trim(); if (c && v) { c.text = v; save(); } }));
+      el.querySelectorAll("[data-cl-del]").forEach((b) => b.onclick = () => { S.ctrl = S.ctrl.filter((x) => x.id !== b.dataset.clDel); reopen(); });
+      const add = () => { const v = val("cl-new"); if (!v) return; if (!S.ctrl.some((c) => norm(c.text) === norm(v))) S.ctrl.push({ id: uid(), text: v }); reopen(); $("#cl-new").focus(); };
+      $("#cl-add").onclick = add;
+      $("#cl-new").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } });
+      el.addEventListener("submit", (e) => { e.preventDefault(); document.activeElement.blur(); back(); });
     });
   }
 
@@ -812,7 +918,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       <h4>Cirugía</h4>
       ${field("c-patologia", "Patología", d.patologia)}
       <div class="row2">${field("c-cx", "Cirugía", d.cx)}${field("c-medico", "Médico", d.medico)}</div>
-      <div class="row2">${field("c-fecha", "Fecha de cirugía *", d.fechaCx, "date")}${field("c-hora", "Hora de cirugía *", d.horaCx || "", "time")}</div>
+      <div class="row2">${field("c-fecha", "Fecha de cirugía", d.fechaCx, "date")}${field("c-hora", "Hora de cirugía", d.horaCx || "", "time")}</div>
       ${field("c-consulta", "1ª consulta", d.consulta, "date")}
       <h4>Circuito</h4>
       <div class="steps-box" id="steps"></div>
@@ -842,8 +948,8 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       // Guarda paciente y cirugía; devuelve [paciente, cirugía] o null si falta el nombre.
       const commit = () => {
         const pdata = person(); if (!pdata.nombre) { $("#c-nombre").focus(); toast("Falta el nombre"); return null; }
-        if (!val("c-fecha")) { $("#c-fecha").focus(); toast("Falta la fecha de la cirugía"); return null; }
-        if (!val("c-hora")) { $("#c-hora").focus(); toast("Falta la hora de la cirugía"); return null; }
+        // Sin fecha se puede guardar (todavía en circuito); con fecha, la hora hace falta para los avisos.
+        if (val("c-fecha") && !val("c-hora")) { $("#c-hora").focus(); toast("Falta la hora de la cirugía"); return null; }
         let pt = p;
         if (!pt) { realData(); pt = Object.assign({ id: uid(), cama: "", medico: val("c-medico"), app: "", dx: "", ingreso: null, alta: null }, pdata); S.patients.push(pt); }
         else Object.assign(pt, pdata);
@@ -856,7 +962,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       el.addEventListener("submit", (e) => {
         e.preventDefault(); const r = commit(); if (!r) return; save(); closeSheet(); render();
         // Al crearla o al cambiar fecha u hora, arma el recordatorio del Calendario con las dos alarmas.
-        toast(isNew ? "Cirugía agregada. Te aviso ese día a las 7:00 y una hora antes" : before !== r[1].fechaCx + " " + r[1].horaCx ? "Fecha cambiada. Los avisos se actualizaron" : "Guardado");
+        toast(isNew ? (r[1].fechaCx ? "Cirugía agregada. Te aviso ese día a las 7:00 y una hora antes" : "Cirugía agregada sin fecha. Cuando la cargues, te aviso") : before !== r[1].fechaCx + " " + r[1].horaCx ? "Fecha cambiada. Los avisos se actualizaron" : "Guardado");
       });
       const mo = $("#mark-op");
       if (mo) mo.onclick = () => {
@@ -946,11 +1052,11 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       toast("Copia guardada");
     } catch (e) { toast("No se pudo guardar la copia en este navegador"); }
   }
-  const backupJson = () => JSON.stringify({ app: "bitacora-camila", version: 3, exportedAt: new Date().toISOString(), patients: S.patients, notes: S.notes, todos: S.todos, surg: S.surg });
+  const backupJson = () => JSON.stringify({ app: "bitacora-camila", version: 3, exportedAt: new Date().toISOString(), patients: S.patients, notes: S.notes, todos: S.todos, surg: S.surg, ctrl: S.ctrl });
   function applyBackup(o) {
     if (!o || o.app !== "bitacora-camila" || !Array.isArray(o.patients) || !Array.isArray(o.surg)) throw new Error("formato");
     const prev = S;
-    S = migrate({ patients: o.patients, notes: o.notes || [], todos: o.todos || [], surg: o.surg, sample: false });
+    S = migrate({ patients: o.patients, notes: o.notes || [], todos: o.todos || [], surg: o.surg, ctrl: o.ctrl || [], sample: false });
     save(); tab = "pase"; day = today(); render();
     toast("Copia recuperada", "Deshacer", () => { S = prev; save(); render(); });
   }
@@ -1000,7 +1106,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
   // Si hubo cambios en los dos lados, junta todo; si un mismo registro cambió en ambos, gana el de este dispositivo.
   function mergeData(local, remote) {
     const out = { sample: false };
-    for (const k of ["patients", "notes", "todos", "surg"]) {
+    for (const k of ["patients", "notes", "todos", "surg", "ctrl"]) {
       const m = new Map((remote[k] || []).map((x) => [x.id, x]));
       (local[k] || []).forEach((x) => m.set(x.id, x));
       out[k] = [...m.values()];
@@ -1021,7 +1127,7 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
         if (isDirty() && !S.sample) {
           S = migrate(Object.assign(blank(), mergeData(S, remote)));
         } else {
-          S = migrate(Object.assign(blank(), { patients: remote.patients, notes: remote.notes || [], todos: remote.todos || [], surg: remote.surg, sample: false }));
+          S = migrate(Object.assign(blank(), { patients: remote.patients, notes: remote.notes || [], todos: remote.todos || [], surg: remote.surg, ctrl: remote.ctrl || [], sample: false }));
         }
         try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {}
         lsSet(REV_KEY, String(last.rev));

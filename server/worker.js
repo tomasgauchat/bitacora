@@ -194,6 +194,8 @@ export class Device extends DurableObject {
       }
       lines.push("END:VEVENT");
     }
+    // El iPhone rechaza la suscripción ("Error de validación") si el calendario no tiene ningún evento.
+    if (!lines.includes("BEGIN:VEVENT")) lines.push("BEGIN:VEVENT", "UID:vacio@bitacora", "DTSTAMP:" + stamp, "DTSTART;VALUE=DATE:20200101", "SUMMARY:Bitácora", "END:VEVENT");
     lines.push("END:VCALENDAR");
     const fold = (l) => { const p = []; for (let i = 0; i < l.length; i += 60) p.push(l.slice(i, i + 60)); return p.join("\r\n "); };
     return lines.map(fold).join("\r\n") + "\r\n";
