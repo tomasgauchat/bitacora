@@ -776,6 +776,21 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
     });
   }
 
+  // Dictado con el reconocimiento de voz del teléfono (gratis; el audio no pasa por el servidor de la app).
+  // Cada toque dicta una frase y la suma al final del campo; si el navegador no lo permite, queda el micrófono del teclado.
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function dictate(btn, field) {
+    if (btn.rec) { btn.rec.stop(); return; }
+    if (!SR) { field.focus(); toast("Toca el micrófono del teclado para dictar"); return; }
+    const rec = new SR(), base = field.value.trim(), label = btn.textContent;
+    rec.lang = "es-AR"; rec.interimResults = true;
+    rec.onresult = (e) => { field.value = (base ? base + " " : "") + [...e.results].map((r) => r[0].transcript).join("").trim(); };
+    rec.onerror = (e) => { if (/not-allowed/.test(e.error)) toast("Sin permiso para el micrófono. Usa el micrófono del teclado"); };
+    rec.onend = () => { btn.rec = null; btn.textContent = label; };
+    try { rec.start(); } catch (err) { field.focus(); toast("Toca el micrófono del teclado para dictar"); return; }
+    btn.rec = rec; btn.textContent = "■ Escuchando… tocar para terminar";
+  }
+
   // Saca las viñetas vacías que quedan al apretar Enter de más.
   const ctrlText = (s) => s.split("\n").filter((l) => l.replace(/^\s*•/, "").trim()).join("\n");
 
@@ -846,9 +861,11 @@ ol.steps { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; 
       ${field("p-alergias", "Alergias", d.alergias)}
       ${area("p-app", "APP (antecedentes)", d.app)}
       ${area("p-dx", "Diagnóstico / cirugía", d.dx)}
+      <button type="button" class="ghost-btn" id="p-dx-mic" style="justify-self:start">🎤 Dictar diagnóstico</button>
       ${field("p-ingreso", "Fecha de ingreso", d.ingreso || day, "date")}
       <div class="actions">${isNew ? "" : `<button type="button" class="danger" id="del">Borrar</button>`}<button type="button" data-close>Cancelar</button><button class="primary" type="submit">Guardar</button></div>
     `, (el) => {
+      $("#p-dx-mic").onclick = (e) => dictate(e.currentTarget, $("#p-dx"));
       el.addEventListener("submit", (e) => {
         e.preventDefault();
         const nombre = val("p-nombre"); if (!nombre) { $("#p-nombre").focus(); toast("Falta el nombre"); return; }
